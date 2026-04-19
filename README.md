@@ -67,12 +67,10 @@ Near term
 - [ ] More time signatures: 3/4, 2/4, 6/8 (beaming rules for compound meters).
 - [ ] Print friendly layout and PDF export.
 - [ ] Mobile touch polish (bigger hit targets, horizontal scroll affordance).
-- [ ] Mixed-division measures (16ths and triplets inside the same bar).
 
 Medium term
 
 - [ ] Grooves library: a small browsable set of named presets (rock, funk, shuffle, common fills), similar to the old GrooveScribe menu.
-- [ ] Permutation generator: given a sticking and a cell selection, generate the permutation table as a list of grooves.
 - [ ] Per-measure variation inside a multi-bar groove (intro, verse, fill).
 - [ ] Click-and-drag to paint cells across a row.
 - [ ] Keyboard shortcuts.
