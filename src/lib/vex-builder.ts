@@ -33,11 +33,7 @@ function durationForSpan(span: number, stepsPerBeat: number): string {
 }
 
 function hasAnyHit(g: Groove, step: number): boolean {
-  return (
-    g.voices.hh[step] !== 0 ||
-    g.voices.sn[step] !== 0 ||
-    g.voices.kk[step] !== 0
-  )
+  return g.voices.hh[step] !== 0 || g.voices.sn[step] !== 0 || g.voices.kk[step] !== 0
 }
 
 interface Built {
@@ -83,7 +79,7 @@ function buildCellKeys(g: Groove, step: number) {
 // currently ringing note for steps that span multiple base positions.
 function buildMainVoice(
   g: Groove,
-  measureStart: number
+  measureStart: number,
 ): { builts: Built[]; stepToBuiltIdx: number[] } {
   const div = g.division
   const stepsPerBeat = div / g.timeSig[0]
@@ -174,7 +170,7 @@ function buildStickingNotes(g: Groove, measureStart: number): GhostNote[] {
 }
 
 export interface StepMarker {
-  x: number     // left edge of marker in svg pixels
+  x: number // left edge of marker in svg pixels
   width: number // width of marker in svg pixels
 }
 
@@ -187,7 +183,7 @@ export interface RenderResult {
 export function renderScore(
   container: HTMLDivElement,
   g: Groove,
-  opts: { width?: number } = {}
+  opts: { width?: number } = {},
 ): RenderResult {
   container.innerHTML = ''
   const stepsPerMeasure = g.division

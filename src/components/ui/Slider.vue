@@ -3,8 +3,15 @@ import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(
-  defineProps<{ modelValue: number; min?: number; max?: number; step?: number; class?: string; disabled?: boolean }>(),
-  { min: 0, max: 100, step: 1 }
+  defineProps<{
+    modelValue: number
+    min?: number
+    max?: number
+    step?: number
+    class?: string
+    disabled?: boolean
+  }>(),
+  { min: 0, max: 100, step: 1 },
 )
 const emit = defineEmits<{ (e: 'update:modelValue', v: number): void }>()
 
@@ -29,7 +36,7 @@ const pct = computed(() => {
       cn(
         'groove-slider w-full appearance-none bg-transparent cursor-pointer',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        props.class
+        props.class,
       )
     "
     @input="(e) => emit('update:modelValue', Number((e.target as HTMLInputElement).value))"
@@ -43,7 +50,11 @@ const pct = computed(() => {
 .groove-slider::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(to right, hsl(var(--primary)) 0 var(--pct, 50%), hsl(var(--muted)) var(--pct, 50%) 100%);
+  background: linear-gradient(
+    to right,
+    hsl(var(--primary)) 0 var(--pct, 50%),
+    hsl(var(--muted)) var(--pct, 50%) 100%
+  );
 }
 .groove-slider::-moz-range-track {
   height: 4px;
@@ -63,16 +74,22 @@ const pct = computed(() => {
   background: hsl(var(--foreground));
   border: 2px solid hsl(var(--primary));
   margin-top: -5px;
-  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 10px -2px hsl(var(--primary) / 0.6);
+  box-shadow:
+    0 0 0 2px hsl(var(--background)),
+    0 0 10px -2px hsl(var(--primary) / 0.6);
   transition: transform 0.1s;
 }
-.groove-slider:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.groove-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
 .groove-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 999px;
   background: hsl(var(--foreground));
   border: 2px solid hsl(var(--primary));
-  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 10px -2px hsl(var(--primary) / 0.6);
+  box-shadow:
+    0 0 0 2px hsl(var(--background)),
+    0 0 10px -2px hsl(var(--primary) / 0.6);
 }
 </style>

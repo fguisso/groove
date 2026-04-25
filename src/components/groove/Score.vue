@@ -72,7 +72,9 @@ defineExpose({
   border-left: 1px solid hsl(var(--primary) / 0.6);
   border-right: 1px solid hsl(var(--primary) / 0.6);
   pointer-events: none;
-  transition: left 60ms linear, width 60ms linear;
+  transition:
+    left 60ms linear,
+    width 60ms linear;
   border-radius: 2px;
 }
 </style>

@@ -23,9 +23,7 @@ const symbol = computed(() => {
 
 const filled = computed(() => props.value !== 0 && props.kind !== 'sticking')
 const accent = computed(
-  () =>
-    (props.kind === 'hat' && props.value === 3) ||
-    (props.kind === 'note' && props.value === 2)
+  () => (props.kind === 'hat' && props.value === 3) || (props.kind === 'note' && props.value === 2),
 )
 </script>
 
@@ -41,7 +39,7 @@ const accent = computed(
         beatStart && downbeat && 'ml-8',
         filled && 'filled',
         filled && accent && 'accent',
-        active && 'active-step'
+        active && 'active-step',
       )
     "
     @click="emit('click')"

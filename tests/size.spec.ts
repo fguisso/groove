@@ -31,11 +31,10 @@ describe('url sizes (informational)', () => {
     }
     samples.push({ name: 'dense 4-measure 32nds', g: dense })
 
-    // eslint-disable-next-line no-console
     console.log('\n--- URL payload sizes ---')
     for (const s of samples) {
       const len = encode(s.g).length
-      // eslint-disable-next-line no-console
+
       console.log(`  ${s.name.padEnd(32)} → ${len} chars`)
     }
   })
