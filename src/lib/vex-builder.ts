@@ -12,7 +12,8 @@ import {
   Stem,
   Voice,
 } from 'vexflow'
-import type { Groove, HatValue, NoteValue } from './model'
+import type { Groove } from './model'
+import { VOICES } from './voices'
 
 // Map { stepsPerBeat: { span → VexFlow duration } }. Covers 4/4 with the
 // supported divisions. Dotted durations collapse "note + following empty"
@@ -33,7 +34,11 @@ function durationForSpan(span: number, stepsPerBeat: number): string {
 }
 
 function hasAnyHit(g: Groove, step: number): boolean {
-  return g.voices.hh[step] !== 0 || g.voices.sn[step] !== 0 || g.voices.kk[step] !== 0
+  for (const voice of VOICES) {
+    const arr = g.voices[voice.id]
+    if (arr && arr[step] !== 0) return true
+  }
+  return false
 }
 
 interface Built {
@@ -46,26 +51,20 @@ interface Built {
 }
 
 function buildCellKeys(g: Groove, step: number) {
-  const hh = g.voices.hh[step] as HatValue
-  const sn = g.voices.sn[step] as NoteValue
-  const kk = g.voices.kk[step] as NoteValue
   const keys: string[] = []
   const articulations: { type: string; position: number }[] = []
   const annotations: { text: string; justify: 'top' | 'bottom' }[] = []
 
-  if (hh !== 0) {
-    keys.push(hh === 4 ? 'f/4/x2' : 'g/5/x2')
-    if (hh === 2) annotations.push({ text: 'o', justify: 'top' })
-    if (hh === 3) articulations.push({ type: 'a>', position: 3 })
-  }
-  if (sn !== 0) {
-    keys.push('c/5')
-    if (sn === 2) articulations.push({ type: 'a>', position: 3 })
-    if (sn === 3) annotations.push({ text: '(·)', justify: 'top' })
-  }
-  if (kk !== 0) {
-    keys.push('f/4')
-    if (kk === 2) articulations.push({ type: 'a>', position: 3 })
+  for (const voice of VOICES) {
+    const arr = g.voices[voice.id]
+    if (!arr) continue
+    const state = arr[step] ?? 0
+    if (state === 0) continue
+    const def = voice.states[state]
+    if (!def) continue
+    keys.push(def.vexKey ?? voice.vexKey)
+    if (def.articulation) articulations.push({ type: def.articulation, position: 3 })
+    if (def.annotation) annotations.push({ text: def.annotation, justify: 'top' })
   }
   return { keys, articulations, annotations }
 }

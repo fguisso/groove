@@ -57,4 +57,36 @@ describe('codec', () => {
     expect(decode('!!!not-valid!!!')).toBeNull()
     expect(decode('')).toBeNull()
   })
+
+  it('round-trips a groove with toms and ride', () => {
+    const g = emptyGroove()
+    const n = g.voices.hh.length
+    g.voices.t1 = new Array(n).fill(0)
+    g.voices.t3 = new Array(n).fill(0)
+    g.voices.ride = new Array(n).fill(0)
+    g.voices.t1[0] = 1
+    g.voices.t1[4] = 2
+    g.voices.t3[8] = 1
+    g.voices.t3[12] = 3
+    g.voices.ride[0] = 1
+    g.voices.ride[2] = 2
+    const decoded = decode(encode(g))!
+    expect(decoded.voices.t1).toEqual(g.voices.t1)
+    expect(decoded.voices.t3).toEqual(g.voices.t3)
+    expect(decoded.voices.ride).toEqual(g.voices.ride)
+  })
+
+  it('decodes a known v3 payload (legacy URL compat)', () => {
+    // Captured from the previous codec on the GrooveScribe sample groove
+    // (16 steps, tempo 80, hh on every 8th, snare on 2 and 4, kick on 1, "e" of 1, and 3).
+    const v3Payload = 'A1AAAEQBBEQggggggggAgACAQQAEAA'
+    const decoded = decode(v3Payload)!
+    expect(decoded).not.toBeNull()
+    expect(decoded.tempo).toBe(80)
+    expect(decoded.division).toBe(16)
+    expect(decoded.measures).toBe(1)
+    expect(decoded.voices.hh).toEqual([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
+    expect(decoded.voices.sn).toEqual([0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0])
+    expect(decoded.voices.kk).toEqual([1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
+  })
 })

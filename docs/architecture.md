@@ -6,10 +6,11 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 ### `src/lib/` — pure logic, no Vue or Tone
 
-- `model.ts` — `Groove` shape, voice and state types (`HatValue`, `NoteValue`, `Sticking`), divisions, cycle helpers, `emptyGroove`, `resizeArrays`.
-- `codec.ts` — bit-packed binary v3 wire format, base64url-encoded for the URL fragment. Header, presence flags, voice cells, optional title/author trailer. Empty default groove encodes to 11 chars.
-- `vex-builder.ts` — turns a `Groove` into a VexFlow staff. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths.
-- `export-midi.ts` — `exportMidi(g)` writes a GM drum track (channel 10) to a `.mid` file via `@tonejs/midi`. The GM mapping table at the top of the file is the canonical voice → MIDI note source today.
+- `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, and synth dispatch keys. Adding a voice is editing this file.
+- `model.ts` — `Groove` shape; `Voices` type guarantees `hh`/`sn`/`kk` are present; toms and ride are optional. Uses `voices.ts` for cycle helpers.
+- `codec.ts` — bit-packed binary, base64url-encoded for the URL fragment. v4 is registry-driven (presence bitmap over `VOICES` order, then cells in order). v3 stays read-only for legacy URLs (maps `t4`→`t3`, `cy`→`ride`).
+- `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths.
+- `export-midi.ts` — `exportMidi(g)` writes a GM drum track (channel 10) via `@tonejs/midi`, looking up notes/velocities from the registry.
 - `export-png.ts` — score → PNG download.
 - `utils.ts` — `cn` class-merge helper.
 
@@ -69,19 +70,20 @@ Embed view reads URL but never writes back.
 
 ## Voice schema today
 
-| Key      | States                               | Bits | Wired in UI?         | Notes                 |
-| -------- | ------------------------------------ | ---- | -------------------- | --------------------- |
-| `hh`     | 5 (off, closed, open, accent, pedal) | 3    | yes                  | hi-hat                |
-| `sn`     | 4 (off, normal, accent, ghost)       | 2    | yes                  | snare                 |
-| `kk`     | 4 (off, normal, accent, ghost)       | 2    | yes                  | kick                  |
-| `t1`     | 4                                    | 2    | no — data-model only | reserved              |
-| `t4`     | 4                                    | 2    | no — data-model only | reserved              |
-| `cy`     | 4                                    | 2    | no — data-model only | reserved              |
-| sticking | 4 (-, R, L, B)                       | 2    | yes                  | per step, not a voice |
+Source of truth: `src/lib/voices.ts`. Keep this table in sync if voices change.
+
+| Key      | States                               | Bits | Wired in UI? | Notes                    |
+| -------- | ------------------------------------ | ---- | ------------ | ------------------------ |
+| `hh`     | 5 (off, closed, open, accent, pedal) | 3    | yes          | hi-hat                   |
+| `sn`     | 4 (off, normal, accent, ghost)       | 2    | yes          | snare                    |
+| `kk`     | 4 (off, normal, accent, ghost)       | 2    | yes          | kick                     |
+| `t1`     | 4 (off, normal, accent, ghost)       | 2    | no — Phase 2 | high tom; synth wired    |
+| `t3`     | 4 (off, normal, accent, ghost)       | 2    | no — Phase 2 | floor tom; synth wired   |
+| `ride`   | 4 (off, normal, accent, ghost)       | 2    | no — Phase 2 | ride cymbal; synth wired |
+| sticking | 4 (-, R, L, B)                       | 2    | yes          | per step, not a voice    |
 
 ## Known limitations
 
-- **Voice keys are hardcoded across five files** (`model`, `codec`, `usePlayback`, `vex-builder`, `export-midi`). Adding a drum is a coordinated edit. The named-voice abstraction (Phase 1, see `docs/specs/named-voice.md`) is meant to fix this.
-- **Beam grouping assumes simple meters.** Compound meters render as straight eighths (`vex-builder.ts:205` TODO).
+- **Beam grouping assumes simple meters.** Compound meters render as straight eighths (`vex-builder.ts` TODO).
 - **No MIDI input today.** Web MIDI listener and grading land in Phase 3.
 - **No timing tests.** Codec round-trip is covered; playback timing is not. Add tests in the phase that needs them.

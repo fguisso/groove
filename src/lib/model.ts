@@ -1,3 +1,5 @@
+import { VOICE_BY_ID, VOICE_IDS, type VoiceId } from './voices'
+
 export type HatValue = 0 | 1 | 2 | 3 | 4
 export type NoteValue = 0 | 1 | 2 | 3
 export type Sticking = '-' | 'R' | 'L' | 'B'
@@ -6,22 +8,13 @@ export const HAT_STATES: HatValue[] = [0, 1, 2, 3, 4]
 export const NOTE_STATES: NoteValue[] = [0, 1, 2, 3]
 export const STICK_STATES: Sticking[] = ['-', 'R', 'L', 'B']
 
-export const HAT_LABEL: Record<HatValue, string> = {
-  0: '·',
-  1: 'x',
-  2: 'o',
-  3: 'X',
-  4: 'f',
-}
-export const NOTE_LABEL: Record<NoteValue, string> = {
-  0: '·',
-  1: '●',
-  2: '◆',
-  3: '○',
-}
-
 export type Division = 4 | 6 | 8 | 12 | 16 | 24 | 32
 export const DIVISIONS: Division[] = [4, 6, 8, 12, 16, 24, 32]
+
+// Voice cells keyed by voice id. hh, sn, kk are always pre-allocated for the
+// editor; toms/ride are populated on demand.
+export type DefaultVoiceId = 'hh' | 'sn' | 'kk'
+export type Voices = Record<DefaultVoiceId, number[]> & Partial<Record<VoiceId, number[]>>
 
 export interface Groove {
   v: 1
@@ -35,14 +28,7 @@ export interface Groove {
   metronome: boolean
   countIn: boolean
   loop: boolean
-  voices: {
-    hh: HatValue[]
-    sn: NoteValue[]
-    kk: NoteValue[]
-    t1?: NoteValue[]
-    t4?: NoteValue[]
-    cy?: NoteValue[]
-  }
+  voices: Voices
   sticking: Sticking[]
 }
 
@@ -50,10 +36,20 @@ export function stepCount(g: Pick<Groove, 'division' | 'measures'>): number {
   return g.division * g.measures
 }
 
+const DEFAULT_VOICES: VoiceId[] = ['hh', 'sn', 'kk']
+
 export function emptyGroove(overrides: Partial<Groove> = {}): Groove {
   const division: Division = overrides.division ?? 16
   const measures = overrides.measures ?? 1
   const n = division * measures
+  const voices: Partial<Record<VoiceId, number[]>> = {}
+  for (const id of DEFAULT_VOICES) {
+    voices[id] = overrides.voices?.[id] ?? new Array(n).fill(0)
+  }
+  for (const id of VOICE_IDS) {
+    if (DEFAULT_VOICES.includes(id)) continue
+    if (overrides.voices?.[id]) voices[id] = overrides.voices[id]
+  }
   return {
     v: 1,
     title: overrides.title ?? '',
@@ -66,39 +62,35 @@ export function emptyGroove(overrides: Partial<Groove> = {}): Groove {
     metronome: overrides.metronome ?? false,
     countIn: overrides.countIn ?? false,
     loop: overrides.loop ?? true,
-    voices: {
-      hh: overrides.voices?.hh ?? new Array(n).fill(0),
-      sn: overrides.voices?.sn ?? new Array(n).fill(0),
-      kk: overrides.voices?.kk ?? new Array(n).fill(0),
-      t1: overrides.voices?.t1,
-      t4: overrides.voices?.t4,
-      cy: overrides.voices?.cy,
-    },
+    voices: voices as Voices,
     sticking: overrides.sticking ?? new Array(n).fill('-'),
   }
 }
 
-export function resizeArrays(g: Groove): Groove {
+export interface PartialGroove extends Omit<Groove, 'voices'> {
+  voices: Partial<Record<VoiceId, number[]>>
+}
+
+export function resizeArrays(g: Groove | PartialGroove): Groove {
   const n = stepCount(g)
-  const fit = <T>(arr: T[] | undefined, fill: T): T[] | undefined => {
-    if (!arr) return undefined
-    if (arr.length === n) return arr
-    if (arr.length < n) return [...arr, ...new Array(n - arr.length).fill(fill)]
-    return arr.slice(0, n)
+  const voices: Partial<Record<VoiceId, number[]>> = {}
+  for (const id of VOICE_IDS) {
+    const arr = g.voices[id]
+    if (!arr) continue
+    if (arr.length === n) voices[id] = arr
+    else if (arr.length < n) voices[id] = [...arr, ...new Array(n - arr.length).fill(0)]
+    else voices[id] = arr.slice(0, n)
   }
-  const requireFit = <T>(arr: T[], fill: T): T[] => fit(arr, fill) as T[]
-  return {
-    ...g,
-    voices: {
-      hh: requireFit(g.voices.hh, 0 as HatValue),
-      sn: requireFit(g.voices.sn, 0 as NoteValue),
-      kk: requireFit(g.voices.kk, 0 as NoteValue),
-      t1: fit(g.voices.t1, 0 as NoteValue),
-      t4: fit(g.voices.t4, 0 as NoteValue),
-      cy: fit(g.voices.cy, 0 as NoteValue),
-    },
-    sticking: requireFit(g.sticking, '-' as Sticking),
+  for (const id of DEFAULT_VOICES) {
+    if (!voices[id]) voices[id] = new Array(n).fill(0)
   }
+  const sticking =
+    g.sticking.length === n
+      ? g.sticking
+      : g.sticking.length < n
+        ? [...g.sticking, ...new Array(n - g.sticking.length).fill('-' as Sticking)]
+        : g.sticking.slice(0, n)
+  return { ...g, voices: voices as Voices, sticking }
 }
 
 export function cycleHat(v: HatValue): HatValue {
@@ -110,4 +102,9 @@ export function cycleNote(v: NoteValue): NoteValue {
 export function cycleSticking(v: Sticking): Sticking {
   const i = STICK_STATES.indexOf(v)
   return STICK_STATES[(i + 1) % STICK_STATES.length]
+}
+
+export function cycleVoiceCell(voiceId: VoiceId, current: number): number {
+  const v = VOICE_BY_ID[voiceId]
+  return (current + 1) % v.states.length
 }

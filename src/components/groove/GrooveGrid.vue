@@ -2,13 +2,14 @@
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
+import { VOICE_BY_ID, type VoiceId } from '@/lib/voices'
 import NoteCell from './NoteCell.vue'
 
 const props = defineProps<{ activeStep?: number }>()
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 
-const cols = computed(() => groove.value.voices.hh.length)
+const cols = computed(() => groove.value.voices.hh?.length ?? 0)
 const perBeat = computed(() => groove.value.division / (groove.value.timeSig[1] === 8 ? 2 : 1))
 
 function isBeat(i: number) {
@@ -22,11 +23,11 @@ const gridStyle = computed(() => ({
   gridTemplateColumns: `96px repeat(${cols.value}, minmax(26px, 1fr))`,
 }))
 
-const voices: { key: 'hh' | 'sn' | 'kk'; label: string; kind: 'hat' | 'note' }[] = [
-  { key: 'hh', label: 'HI-HAT', kind: 'hat' },
-  { key: 'sn', label: 'SNARE', kind: 'note' },
-  { key: 'kk', label: 'KICK', kind: 'note' },
-]
+const VISIBLE_LANES: VoiceId[] = ['hh', 'sn', 'kk']
+const lanes = VISIBLE_LANES.map((id) => {
+  const v = VOICE_BY_ID[id]
+  return { key: id, label: v.label, kind: v.kind }
+})
 
 // null = never toggled → follow auto (show if any sticking values exist)
 // true/false = explicit user choice, overrides auto
@@ -76,14 +77,14 @@ function toggleSticking() {
         />
       </template>
 
-      <template v-for="v in voices" :key="v.key">
+      <template v-for="v in lanes" :key="v.key">
         <div
           class="pr-3 flex items-center text-[10px] font-mono tracking-wider text-muted-foreground"
         >
           {{ v.label }}
         </div>
         <NoteCell
-          v-for="(val, i) in groove.voices[v.key]"
+          v-for="(val, i) in groove.voices[v.key] ?? []"
           :key="v.key + '-' + i"
           :value="val as number"
           :kind="v.kind"

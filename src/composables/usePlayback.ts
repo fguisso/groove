@@ -1,8 +1,10 @@
 import { ref, shallowRef, watch } from 'vue'
 import * as Tone from 'tone'
 import type { Groove } from '@/lib/model'
+import { VOICES, effectiveSynthKey } from '@/lib/voices'
 
-type VoiceKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 'click'
+type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't3' | 'ride' | 'click'
+type Trigger = (time: number, velocity?: number) => void
 
 /**
  * Synthesized drum voices. All sounds generated from WebAudio primitives — no sample loading.
@@ -13,9 +15,11 @@ type VoiceKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 'click'
  *   hh closed: white noise → highpass 7kHz, ~35ms envelope (crisp tick)
  *   hh open:   white noise → highpass 5.5kHz, ~400ms envelope (sustained)
  *   hh pedal:  white noise → bandpass 4.5kHz, ~50ms envelope (muted chick)
+ *   tom1 / t3: MembraneSynth tuned for high tom and floor tom
+ *   ride:      filtered noise + tonal partial around 5kHz
  *   click:     square wave, C6 on downbeat / G5 on other beats
  */
-function makeSynth(kind: VoiceKey): (time: number, velocity?: number) => void {
+function makeSynth(kind: SynthKey): Trigger {
   if (kind === 'kk') {
     const synth = new Tone.MembraneSynth({
       pitchDecay: 0.04,
@@ -80,6 +84,47 @@ function makeSynth(kind: VoiceKey): (time: number, velocity?: number) => void {
     return (time, v = 1) => noise.triggerAttackRelease('32n', time, v)
   }
 
+  if (kind === 't1') {
+    const synth = new Tone.MembraneSynth({
+      pitchDecay: 0.03,
+      octaves: 2.5,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.4 },
+    }).toDestination()
+    synth.volume.value = -8
+    return (time, v = 1) => synth.triggerAttackRelease('A3', '8n', time, v)
+  }
+
+  if (kind === 't3') {
+    const synth = new Tone.MembraneSynth({
+      pitchDecay: 0.04,
+      octaves: 3,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.5 },
+    }).toDestination()
+    synth.volume.value = -7
+    return (time, v = 1) => synth.triggerAttackRelease('E2', '8n', time, v)
+  }
+
+  if (kind === 'ride') {
+    const noise = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.6, sustain: 0.02, release: 0.6 },
+    })
+    const hp = new Tone.Filter({ type: 'highpass', frequency: 4500, Q: 0.6 })
+    noise.chain(hp, Tone.getDestination())
+    noise.volume.value = -16
+    const bell = new Tone.Synth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 },
+    }).toDestination()
+    bell.volume.value = -22
+    return (time, v = 1) => {
+      noise.triggerAttackRelease('4n', time, v)
+      bell.triggerAttackRelease('E5', '8n', time, v * 0.5)
+    }
+  }
+
   // click (metronome)
   const synth = new Tone.Synth({
     oscillator: { type: 'square' },
@@ -92,25 +137,21 @@ function makeSynth(kind: VoiceKey): (time: number, velocity?: number) => void {
   }
 }
 
+const ALL_SYNTH_KEYS: SynthKey[] = ['kk', 'sn', 'hh', 'hho', 'hhp', 't1', 't3', 'ride', 'click']
+
 export function usePlayback() {
   const isPlaying = ref(false)
   const currentStep = ref(-1)
-  // 0 = no count-in active; 1..N = current beat of the count-in bar
   const countInBeat = ref(0)
   const part = shallowRef<Tone.Part | null>(null)
-  const players = shallowRef<Record<VoiceKey, (time: number, v?: number) => void> | null>(null)
+  const players = shallowRef<Record<SynthKey, Trigger> | null>(null)
 
   function ensurePlayers() {
     if (players.value) return players.value
-    players.value = {
-      kk: makeSynth('kk'),
-      sn: makeSynth('sn'),
-      hh: makeSynth('hh'),
-      hho: makeSynth('hho'),
-      hhp: makeSynth('hhp'),
-      click: makeSynth('click'),
-    }
-    return players.value
+    const map = {} as Record<SynthKey, Trigger>
+    for (const k of ALL_SYNTH_KEYS) map[k] = makeSynth(k)
+    players.value = map
+    return map
   }
 
   function applySwing(g: Groove) {
@@ -144,15 +185,12 @@ export function usePlayback() {
     Tone.getTransport().bpm.value = g.tempo
     applySwing(g)
 
-    const n = g.voices.hh.length
+    const n = g.voices.hh?.length ?? g.division * g.measures
     const stepDur = subdivision(g)
     const beatsPerMeasure = g.timeSig[0]
     const stepsPerBeat = g.division / beatsPerMeasure
     const stepsPerMeasure = g.division
 
-    // Count-in: schedule `beatsPerMeasure` audible clicks before the groove
-    // starts, and pulse `countInBeat` from 1..beatsPerMeasure so the UI can
-    // show the count.
     const beatSec = 60 / g.tempo
     const countInLen = g.countIn ? beatsPerMeasure * beatSec : 0
 
@@ -162,22 +200,19 @@ export function usePlayback() {
 
     const newPart = new Tone.Part((time, ev: { step: number }) => {
       const step = ev.step
-      const hh = g.voices.hh[step]
-      const sn = g.voices.sn[step]
-      const kk = g.voices.kk[step]
 
-      if (hh === 1) p.hh(time, 0.8)
-      else if (hh === 2) p.hho(time, 0.9)
-      else if (hh === 3) p.hh(time, 1)
-      else if (hh === 4) p.hhp(time, 0.9)
-
-      if (sn === 1) p.sn(time, 0.85)
-      else if (sn === 2) p.sn(time, 1)
-      else if (sn === 3) p.sn(time, 0.35)
-
-      if (kk === 1) p.kk(time, 0.9)
-      else if (kk === 2) p.kk(time, 1)
-      else if (kk === 3) p.kk(time, 0.55)
+      for (const voice of VOICES) {
+        const arr = g.voices[voice.id]
+        if (!arr) continue
+        const state = arr[step] ?? 0
+        if (state === 0) continue
+        const synthKey = effectiveSynthKey(voice.id, state)
+        if (!synthKey) continue
+        const trigger = p[synthKey as SynthKey]
+        if (!trigger) continue
+        const def = voice.states[state]
+        trigger(time, def.velocity ?? 1)
+      }
 
       if (g.metronome && step % stepsPerBeat === 0) {
         const isDownbeat = step % stepsPerMeasure === 0
@@ -204,7 +239,6 @@ export function usePlayback() {
           }, time)
         }, i * beatSec)
       }
-      // Clear the count-in overlay right when the groove takes over.
       Tone.getTransport().scheduleOnce((time) => {
         Tone.getDraw().schedule(() => {
           countInBeat.value = 0
