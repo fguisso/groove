@@ -6,7 +6,7 @@
 // adding the synth in `usePlayback.ts`. Everything else (codec, score,
 // MIDI export) reads from here.
 
-export type VoiceId = 'hh' | 'sn' | 'kk' | 't1' | 't3' | 'ride'
+export type VoiceId = 'hh' | 'sn' | 'kk' | 't1' | 't2' | 't3' | 'ride'
 export type VoiceKind = 'hat' | 'note'
 
 export interface VoiceState {
@@ -87,6 +87,20 @@ export const VOICES: readonly Voice[] = [
       { midi: 50, velocity: 0.85, symbol: '●' },
       { midi: 50, velocity: 1, symbol: '◆', articulation: 'a>' },
       { midi: 50, velocity: 0.45, symbol: '○' },
+    ],
+  },
+  {
+    id: 't2',
+    label: 'TOM 2',
+    kind: 'note',
+    bitsPerCell: 2,
+    vexKey: 'd/5',
+    defaultSynthKey: 't2',
+    states: [
+      {},
+      { midi: 47, velocity: 0.85, symbol: '●' },
+      { midi: 47, velocity: 1, symbol: '◆', articulation: 'a>' },
+      { midi: 47, velocity: 0.45, symbol: '○' },
     ],
   },
   {

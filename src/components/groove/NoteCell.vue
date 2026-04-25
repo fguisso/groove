@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
+import { VOICE_BY_ID, type VoiceId } from '@/lib/voices'
 
 const props = defineProps<{
   value: number
   kind: 'hat' | 'note' | 'sticking'
+  voiceId?: VoiceId
   active?: boolean
   beat?: boolean
   downbeat?: boolean
@@ -15,6 +17,9 @@ const emit = defineEmits<{ (e: 'click'): void }>()
 
 const symbol = computed(() => {
   if (props.kind === 'sticking') return props.label ?? ''
+  if (props.voiceId) {
+    return VOICE_BY_ID[props.voiceId].states[props.value]?.symbol ?? ''
+  }
   if (props.kind === 'hat') {
     return ({ 0: '', 1: 'x', 2: 'o', 3: 'X', 4: 'f' } as Record<number, string>)[props.value] ?? ''
   }
@@ -22,9 +27,13 @@ const symbol = computed(() => {
 })
 
 const filled = computed(() => props.value !== 0 && props.kind !== 'sticking')
-const accent = computed(
-  () => (props.kind === 'hat' && props.value === 3) || (props.kind === 'note' && props.value === 2),
-)
+const accent = computed(() => {
+  if (props.kind === 'sticking') return false
+  if (props.voiceId) {
+    return !!VOICE_BY_ID[props.voiceId].states[props.value]?.articulation
+  }
+  return (props.kind === 'hat' && props.value === 3) || (props.kind === 'note' && props.value === 2)
+})
 </script>
 
 <template>

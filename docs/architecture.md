@@ -72,15 +72,16 @@ Embed view reads URL but never writes back.
 
 Source of truth: `src/lib/voices.ts`. Keep this table in sync if voices change.
 
-| Key      | States                               | Bits | Wired in UI? | Notes                    |
-| -------- | ------------------------------------ | ---- | ------------ | ------------------------ |
-| `hh`     | 5 (off, closed, open, accent, pedal) | 3    | yes          | hi-hat                   |
-| `sn`     | 4 (off, normal, accent, ghost)       | 2    | yes          | snare                    |
-| `kk`     | 4 (off, normal, accent, ghost)       | 2    | yes          | kick                     |
-| `t1`     | 4 (off, normal, accent, ghost)       | 2    | no — Phase 2 | high tom; synth wired    |
-| `t3`     | 4 (off, normal, accent, ghost)       | 2    | no — Phase 2 | floor tom; synth wired   |
-| `ride`   | 4 (off, normal, accent, ghost)       | 2    | no — Phase 2 | ride cymbal; synth wired |
-| sticking | 4 (-, R, L, B)                       | 2    | yes          | per step, not a voice    |
+| Key      | States                               | Bits | Wired in UI? | Notes                 |
+| -------- | ------------------------------------ | ---- | ------------ | --------------------- |
+| `hh`     | 5 (off, closed, open, accent, pedal) | 3    | yes          | hi-hat                |
+| `sn`     | 4 (off, normal, accent, ghost)       | 2    | yes          | snare                 |
+| `kk`     | 4 (off, normal, accent, ghost)       | 2    | yes          | kick                  |
+| `t1`     | 4 (off, normal, accent, ghost)       | 2    | yes          | high tom              |
+| `t2`     | 4 (off, normal, accent, ghost)       | 2    | yes          | mid tom               |
+| `t3`     | 4 (off, normal, accent, ghost)       | 2    | yes          | floor tom             |
+| `ride`   | 4 (off, normal, accent, ghost)       | 2    | yes          | ride cymbal           |
+| sticking | 4 (-, R, L, B)                       | 2    | yes          | per step, not a voice |
 
 ## Known limitations
 
