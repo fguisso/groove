@@ -3,7 +3,7 @@ import * as Tone from 'tone'
 import type { Groove } from '@/lib/model'
 import { VOICES, effectiveSynthKey } from '@/lib/voices'
 
-type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't3' | 'ride' | 'click'
+type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't2' | 't3' | 'ride' | 'click'
 type Trigger = (time: number, velocity?: number) => void
 
 /**
@@ -95,6 +95,17 @@ function makeSynth(kind: SynthKey): Trigger {
     return (time, v = 1) => synth.triggerAttackRelease('A3', '8n', time, v)
   }
 
+  if (kind === 't2') {
+    const synth = new Tone.MembraneSynth({
+      pitchDecay: 0.035,
+      octaves: 2.7,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.45 },
+    }).toDestination()
+    synth.volume.value = -8
+    return (time, v = 1) => synth.triggerAttackRelease('F3', '8n', time, v)
+  }
+
   if (kind === 't3') {
     const synth = new Tone.MembraneSynth({
       pitchDecay: 0.04,
@@ -137,7 +148,18 @@ function makeSynth(kind: SynthKey): Trigger {
   }
 }
 
-const ALL_SYNTH_KEYS: SynthKey[] = ['kk', 'sn', 'hh', 'hho', 'hhp', 't1', 't3', 'ride', 'click']
+const ALL_SYNTH_KEYS: SynthKey[] = [
+  'kk',
+  'sn',
+  'hh',
+  'hho',
+  'hhp',
+  't1',
+  't2',
+  't3',
+  'ride',
+  'click',
+]
 
 export function usePlayback() {
   const isPlaying = ref(false)

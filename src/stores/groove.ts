@@ -49,13 +49,19 @@ export const useGrooveStore = defineStore('groove', {
       this.groove.loop = !this.groove.loop
     },
     cycleCell(voice: VoiceId, i: number) {
-      const arr = this.groove.voices[voice]
-      if (!arr) return
+      const n = this.groove.voices.hh.length
+      if (!this.groove.voices[voice]) {
+        this.groove.voices[voice] = new Array(n).fill(0)
+      }
+      const arr = this.groove.voices[voice]!
       arr[i] = cycleVoiceCell(voice, arr[i])
     },
     setCell(voice: VoiceId, i: number, val: number) {
-      const arr = this.groove.voices[voice]
-      if (arr) arr[i] = val
+      const n = this.groove.voices.hh.length
+      if (!this.groove.voices[voice]) {
+        this.groove.voices[voice] = new Array(n).fill(0)
+      }
+      this.groove.voices[voice]![i] = val
     },
     cycleSticking(i: number) {
       this.groove.sticking[i] = cycleSticking(this.groove.sticking[i])

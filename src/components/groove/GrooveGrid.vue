@@ -23,7 +23,7 @@ const gridStyle = computed(() => ({
   gridTemplateColumns: `96px repeat(${cols.value}, minmax(26px, 1fr))`,
 }))
 
-const VISIBLE_LANES: VoiceId[] = ['hh', 'sn', 'kk']
+const VISIBLE_LANES: VoiceId[] = ['hh', 'ride', 't1', 't2', 't3', 'sn', 'kk']
 const lanes = VISIBLE_LANES.map((id) => {
   const v = VOICE_BY_ID[id]
   return { key: id, label: v.label, kind: v.kind }
@@ -84,15 +84,16 @@ function toggleSticking() {
           {{ v.label }}
         </div>
         <NoteCell
-          v-for="(val, i) in groove.voices[v.key] ?? []"
-          :key="v.key + '-' + i"
-          :value="val as number"
+          v-for="i in cols"
+          :key="v.key + '-' + (i - 1)"
+          :value="(groove.voices[v.key] ?? [])[i - 1] ?? 0"
           :kind="v.kind"
-          :beat="isBeat(i)"
-          :downbeat="isDownbeat(i)"
-          :beat-start="i > 0 && isBeat(i)"
-          :active="props.activeStep === i"
-          @click="store.cycleCell(v.key, i)"
+          :voice-id="v.key"
+          :beat="isBeat(i - 1)"
+          :downbeat="isDownbeat(i - 1)"
+          :beat-start="i - 1 > 0 && isBeat(i - 1)"
+          :active="props.activeStep === i - 1"
+          @click="store.cycleCell(v.key, i - 1)"
         />
       </template>
     </div>

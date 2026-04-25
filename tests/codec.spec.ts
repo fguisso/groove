@@ -62,16 +62,20 @@ describe('codec', () => {
     const g = emptyGroove()
     const n = g.voices.hh.length
     g.voices.t1 = new Array(n).fill(0)
+    g.voices.t2 = new Array(n).fill(0)
     g.voices.t3 = new Array(n).fill(0)
     g.voices.ride = new Array(n).fill(0)
     g.voices.t1[0] = 1
     g.voices.t1[4] = 2
+    g.voices.t2[2] = 1
+    g.voices.t2[6] = 3
     g.voices.t3[8] = 1
     g.voices.t3[12] = 3
     g.voices.ride[0] = 1
     g.voices.ride[2] = 2
     const decoded = decode(encode(g))!
     expect(decoded.voices.t1).toEqual(g.voices.t1)
+    expect(decoded.voices.t2).toEqual(g.voices.t2)
     expect(decoded.voices.t3).toEqual(g.voices.t3)
     expect(decoded.voices.ride).toEqual(g.voices.ride)
   })

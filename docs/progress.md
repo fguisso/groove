@@ -4,6 +4,28 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-04-25 — Phase 2 complete
+
+**Status:** Toms (t1, t2, t3) and ride lane wired in UI, render, and playback.
+
+**Done:**
+
+- Added `t2` (mid tom, GM 47) to the registry alongside the existing `t1` and `t3`. Synth in `usePlayback.ts` is a `MembraneSynth` tuned between `t1` (high) and `t3` (floor).
+- Editor grid now shows seven lanes top-down: HI-HAT → RIDE → TOM 1 → TOM 2 → TOM 3 → SNARE → KICK.
+- Lazy-allocated voice arrays in the store: clicking a tom or ride cell creates the array on first use, so empty lanes don't bloat URLs.
+- `NoteCell` now reads its symbol/accent from the registry when given a `voiceId`. Ride cells render `x`/`X` to match the score notation; toms keep `●`/`◆`/`○`.
+- Codec test extended to round-trip t2 alongside t1, t3, ride.
+
+**Decisions:**
+
+- Editor lane order keeps toms grouped together rather than splitting around the snare like a drum chart. Easier to scan when editing.
+- All four extra lanes (ride + 3 toms) are always visible. No "+ Add tom" affordance for now; toggle UI adds noise we don't yet need.
+- t2 GM note is 47 (low-mid tom). Standard GM has 48 too (hi-mid); we picked the lower one because the kit's mid tom typically sits closer to floor in pitch.
+
+**Next:** Phase 3 — MIDI input MVP. Read `docs/specs/midi-input.md`. The registry already has GM mappings per voice — Phase 3 inverts that map for input. Open design questions on the spec (latency calibration, grading model, display) need decisions before coding.
+
+---
+
 ## 2026-04-25 — Phase 1 complete
 
 **Status:** Named voice abstraction landed. Ready for Phase 2.
