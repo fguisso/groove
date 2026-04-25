@@ -1,16 +1,14 @@
 import { defineStore } from 'pinia'
 import {
-  cycleHat,
-  cycleNote,
   cycleSticking,
+  cycleVoiceCell,
   emptyGroove,
   resizeArrays,
   type Division,
   type Groove,
-  type HatValue,
-  type NoteValue,
   type Sticking,
 } from '@/lib/model'
+import { VOICES, type VoiceId } from '@/lib/voices'
 
 export const useGrooveStore = defineStore('groove', {
   state: (): { groove: Groove } => ({ groove: emptyGroove() }),
@@ -50,23 +48,14 @@ export const useGrooveStore = defineStore('groove', {
     toggleLoop() {
       this.groove.loop = !this.groove.loop
     },
-    cycleCell(voice: 'hh' | 'sn' | 'kk' | 't1' | 't4' | 'cy', i: number) {
-      const v = this.groove.voices
-      if (voice === 'hh') {
-        v.hh[i] = cycleHat(v.hh[i])
-      } else {
-        const arr = v[voice]
-        if (!arr) return
-        arr[i] = cycleNote(arr[i] as NoteValue)
-      }
+    cycleCell(voice: VoiceId, i: number) {
+      const arr = this.groove.voices[voice]
+      if (!arr) return
+      arr[i] = cycleVoiceCell(voice, arr[i])
     },
-    setCell(voice: 'hh' | 'sn' | 'kk' | 't1' | 't4' | 'cy', i: number, val: HatValue | NoteValue) {
-      const v = this.groove.voices
-      if (voice === 'hh') v.hh[i] = val as HatValue
-      else {
-        const arr = v[voice]
-        if (arr) arr[i] = val as NoteValue
-      }
+    setCell(voice: VoiceId, i: number, val: number) {
+      const arr = this.groove.voices[voice]
+      if (arr) arr[i] = val
     },
     cycleSticking(i: number) {
       this.groove.sticking[i] = cycleSticking(this.groove.sticking[i])
@@ -75,13 +64,11 @@ export const useGrooveStore = defineStore('groove', {
       this.groove.sticking[i] = val
     },
     clearAll() {
-      const n = this.groove.voices.hh.length
-      this.groove.voices.hh = new Array(n).fill(0)
-      this.groove.voices.sn = new Array(n).fill(0)
-      this.groove.voices.kk = new Array(n).fill(0)
-      if (this.groove.voices.t1) this.groove.voices.t1 = new Array(n).fill(0)
-      if (this.groove.voices.t4) this.groove.voices.t4 = new Array(n).fill(0)
-      if (this.groove.voices.cy) this.groove.voices.cy = new Array(n).fill(0)
+      const n = this.groove.voices.hh?.length ?? this.groove.division * this.groove.measures
+      for (const v of VOICES) {
+        const arr = this.groove.voices[v.id]
+        if (arr) this.groove.voices[v.id] = new Array(n).fill(0)
+      }
       this.groove.sticking = new Array(n).fill('-')
     },
   },

@@ -4,6 +4,28 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-04-25 — Phase 1 complete
+
+**Status:** Named voice abstraction landed. Ready for Phase 2.
+
+**Done:**
+
+- Added `src/lib/voices.ts` — single source of truth for voice metadata: id, label, kind, bitsPerCell, MIDI mapping per state, VexFlow render hints, synth dispatch keys.
+- Bumped wire format to v4 (registry-driven voice presence bitmap). v3 stays read-only for legacy URLs; `t4` decodes to `t3` and `cy` decodes to `ride` so the wiki embed (`A1AAAEQBBEQggggggggAgACAQQAEAA`) still works.
+- Refactored `model.ts`, `codec.ts`, `usePlayback.ts`, `vex-builder.ts`, `export-midi.ts`, and `stores/groove.ts` to read from the registry. Adding a voice now means: append to `VOICES`, add a synth in `usePlayback.ts` (only if its sound is genuinely new), and add a UI lane.
+- Added codec tests: a v3 backward-compat case with the wiki payload, and a v4 round-trip exercising t1, t3, ride.
+
+**Decisions:**
+
+- Wire format kept presence as a 1-byte bitmap (max 8 voices). When we cross 8, bump format and use 2 bytes.
+- Voice ids renamed: `t4` → `t3` (we have at most 3 toms in the target kit), `cy` → `ride` (specific instrument, not "any cymbal").
+- `Voices` type guarantees `hh`, `sn`, `kk` are always present; toms and ride are optional. Keeps existing accessor sites simple.
+- Synths for `t1`, `t3`, `ride` are pre-built in `usePlayback.ts` even though they have no UI yet — the lane addition in Phase 2 is then UI-only.
+
+**Next:** Phase 2 — toms (t1, t2, t3) + ride lane in UI/render/playback. Read `docs/specs/toms-and-ride.md`. Note that the registry currently has `t1`, `t3`, `ride`; Phase 2 must add `t2` and decide whether to include t1/t2/t3 in the visible grid.
+
+---
+
 ## 2026-04-25 — Phase 0 complete
 
 **Status:** Engineering harness in place. Ready to start Phase 1.
