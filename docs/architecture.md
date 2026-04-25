@@ -6,18 +6,20 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 ### `src/lib/` — pure logic, no Vue or Tone
 
-- `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, and synth dispatch keys. Adding a voice is editing this file.
+- `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, and synth dispatch keys. Includes `voiceForMidiNote()` for MIDI input mapping (registry states + `INPUT_ONLY_MIDI` for kit-side notes like snare rim).
 - `model.ts` — `Groove` shape; `Voices` type guarantees `hh`/`sn`/`kk` are present; toms and ride are optional. Uses `voices.ts` for cycle helpers.
 - `codec.ts` — bit-packed binary, base64url-encoded for the URL fragment. v4 is registry-driven (presence bitmap over `VOICES` order, then cells in order). v3 stays read-only for legacy URLs (maps `t4`→`t3`, `cy`→`ride`).
 - `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths.
 - `export-midi.ts` — `exportMidi(g)` writes a GM drum track (channel 10) via `@tonejs/midi`, looking up notes/velocities from the registry.
 - `export-png.ts` — score → PNG download.
+- `midi-grader.ts` — pure grading logic. `buildSchedule(g, startMs)` produces expected hits; `gradeHits(expected, actual, tol)` matches and grades; `summarize(report)` rolls up to a percentage.
 - `utils.ts` — `cn` class-merge helper.
 
 ### `src/composables/`
 
-- `usePlayback.ts` — owns Tone.js synth construction (kk, sn, hh closed/open/pedal, click), the `Tone.Part` scheduler, swing, count-in, and the playback `currentStep` ref. Voice dispatch is the `VoiceKey` union local to this file.
+- `usePlayback.ts` — owns Tone.js synth construction (kk, sn, hh closed/open/pedal, t1/t2/t3, ride, click), the `Tone.Part` scheduler, swing, count-in, and the playback `currentStep` ref. Voice dispatch reads `voices.ts`.
 - `useUrlSync.ts` — keeps the `Groove` store in sync with the hash payload. Editor writes back; embed does not.
+- `useMidiInput.ts` — Web MIDI wrapper. Requests access, listens to the first input, maps GM notes to voice ids via `voices.voiceForMidiNote()`, exposes hits with `performance.now()` timestamps.
 
 ### `src/stores/`
 
@@ -86,5 +88,6 @@ Source of truth: `src/lib/voices.ts`. Keep this table in sync if voices change.
 ## Known limitations
 
 - **Beam grouping assumes simple meters.** Compound meters render as straight eighths (`vex-builder.ts` TODO).
-- **No MIDI input today.** Web MIDI listener and grading land in Phase 3.
-- **No timing tests.** Codec round-trip is covered; playback timing is not. Add tests in the phase that needs them.
+- **MIDI grading is single-loop.** Hits past the first loop are still graded against loop 0's schedule.
+- **No per-cell visual feedback for MIDI grading.** Panel shows a numeric report; cell badges (correct/missed/wrong-voice) are a follow-up.
+- **No playback-timing tests.** Codec round-trip and grader logic are covered; the Tone.Part dispatch path is not. Add when behavior justifies it.

@@ -4,6 +4,38 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-04-25 — Phase 3 complete (MVP — needs e-kit verification)
+
+**Status:** Web MIDI listener, grader, and practice panel landed. Logic is unit-tested. End-to-end verification requires a connected e-drum kit and a supported browser; the user owns this.
+
+**Done:**
+
+- `src/lib/midi-grader.ts` — pure logic. `buildSchedule(g, startMs)` derives expected hits from a groove iterating the registry. `gradeHits(expected, actual, tol)` does greedy matching: prefers same-voice within tolerance, falls back to wrong-voice, otherwise marks missed. Unconsumed actuals become extras. `summarize(report)` rolls up to a percentage.
+- `src/composables/useMidiInput.ts` — Web MIDI wrapper. Requests access on click, connects to first input, listens for note-on, maps GM note → voice via `voiceForMidiNote()` in `voices.ts`. Stores hits with `performance.now()` timestamps.
+- `src/lib/voices.ts` — added `voiceForMidiNote()` plus an `INPUT_ONLY_MIDI` table for kit-side notes that don't appear in our state mappings (snare rim 37, alternate tom GMs, crash → ride fallback).
+- `src/components/groove/MidiPanel.vue` — connect/disconnect, latency offset and tolerance inputs (both persisted to `localStorage`), Start/Finish practice buttons, score summary panel.
+- Wired `MidiPanel` into `EditorView`. `EmbedView` stays read-only and has no MIDI affordance.
+- `tests/midi-grader.spec.ts` — 8 cases covering schedule build, exact hits, tolerance window, wrong-voice grading, extras counting, same-voice preference, and summary rollup.
+
+**Decisions:**
+
+- **Practice mode is manual.** User clicks Start, plays through the chart however many loops, clicks Finish. No automatic tie to playback transport — keeps the panel independent and avoids state coupling.
+- **Velocity and dynamic state ignored.** Grading checks voice + timing only. Whether the player executed a hit as accent or ghost is not measured. Adding this needs MIDI velocity → state inference, which is noisy and out of MVP scope.
+- **Latency offset is manual.** No calibration screen yet — user dials in the offset that produces the best scores. Persisted per browser.
+- **Default tolerance is 40 ms.** A typical drummer's tightness on consecutive 16ths at 120 BPM has spread in this range. Increase for forgiving practice, decrease to push tightness.
+- **Aroma TDX 15S kit support.** GM 37 (rim) maps to snare for grading. GM 49 (crash) maps to ride since we don't have a crash voice yet.
+
+**Known gaps for follow-up:**
+
+- No per-cell visual feedback in the grid — the panel shows a numeric report only. Adding cell badges (green/red/yellow) is a UX win but requires plumbing grade state into `GrooveGrid`.
+- Browsers without Web MIDI (Safari) get a clear unsupported message; no fallback.
+- Multi-loop practice: hits past the first loop are still graded against the first loop's schedule. Pull `loop` true into the schedule builder to fix.
+- No streak counter, no tempo ramp, no lesson flow — all explicitly deferred per the spec.
+
+**Next:** End-to-end verification with the Aroma TDX 15S, then iterate from there. Cell-level visual feedback is the highest-value next slice.
+
+---
+
 ## 2026-04-25 — Phase 2 complete
 
 **Status:** Toms (t1, t2, t3) and ride lane wired in UI, render, and playback.

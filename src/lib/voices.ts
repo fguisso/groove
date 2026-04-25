@@ -150,3 +150,29 @@ export function effectiveSynthKey(voiceId: VoiceId, state: number): string | nul
   if (!s) return null
   return s.synthKey ?? v.defaultSynthKey
 }
+
+// Extra GM input mappings beyond what the registry's states declare. The
+// Aroma TDX 15S and similar kits send these notes for sounds that share
+// a voice in our model (rim shots count as snare, kit's specific tom
+// ranges, etc).
+const INPUT_ONLY_MIDI: Record<number, VoiceId> = {
+  37: 'sn', // side stick / rim
+  39: 'sn', // hand clap
+  40: 'sn', // electric snare
+  43: 't3', // high floor tom
+  45: 't2', // low tom
+  48: 't1', // hi-mid tom
+  49: 'ride', // crash → ride (no crash voice yet)
+  53: 'ride', // ride bell
+  57: 'ride', // crash 2 → ride
+  59: 'ride', // ride 2
+}
+
+export function voiceForMidiNote(note: number): VoiceId | null {
+  for (const voice of VOICES) {
+    for (const state of voice.states) {
+      if (state.midi === note) return voice.id
+    }
+  }
+  return INPUT_ONLY_MIDI[note] ?? null
+}

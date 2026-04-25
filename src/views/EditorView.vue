@@ -10,6 +10,7 @@ import ShareDialog from '@/components/shell/ShareDialog.vue'
 import GrooveGrid from '@/components/groove/GrooveGrid.vue'
 import Score from '@/components/groove/Score.vue'
 import Transport from '@/components/groove/Transport.vue'
+import MidiPanel from '@/components/groove/MidiPanel.vue'
 import Select from '@/components/ui/Select.vue'
 import { exportMidi } from '@/lib/export-midi'
 import { exportPng } from '@/lib/export-png'
@@ -75,6 +76,7 @@ async function onExportPng() {
       <Score ref="scoreRef" :active-step="currentStep" />
       <Transport :is-playing="isPlaying" @play="play(groove)" @stop="stop()" />
       <GrooveGrid :active-step="currentStep" />
+      <MidiPanel />
     </main>
 
     <ShareDialog v-model:open="shareOpen" />
