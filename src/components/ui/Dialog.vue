@@ -12,7 +12,7 @@ watch(
   (v) => {
     if (v) document.addEventListener('keydown', onKey)
     else document.removeEventListener('keydown', onKey)
-  }
+  },
 )
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>

@@ -5,7 +5,7 @@ withDefaults(
     variant?: 'full' | 'mono'
     ariaLabel?: string
   }>(),
-  { width: 160, variant: 'full', ariaLabel: 'groove logotipo' }
+  { width: 160, variant: 'full', ariaLabel: 'groove logotipo' },
 )
 </script>
 
@@ -25,14 +25,18 @@ withDefaults(
       font-family="'Didact Gothic', 'Oferta do Dia', 'Inter', sans-serif"
       font-size="296.85"
       font-weight="400"
-    >{{ variant === 'mono' ? 'g' : 'groove' }}</text>
-    <polygon
-      points="60.34 198.02 84.8 150.91 107.45 198.02 60.34 198.02"
-      fill="currentColor"
-    />
+    >
+      {{ variant === 'mono' ? 'g' : 'groove' }}
+    </text>
+    <polygon points="60.34 198.02 84.8 150.91 107.45 198.02 60.34 198.02" fill="currentColor" />
   </svg>
 </template>
 
 <style scoped>
-.groove-wordmark { display: block; width: auto; max-width: 100%; color: inherit; }
+.groove-wordmark {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  color: inherit;
+}
 </style>

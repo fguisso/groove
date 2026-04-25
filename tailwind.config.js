@@ -44,11 +44,29 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter var', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Geist Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
+        sans: [
+          'Inter var',
+          'Inter',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'sans-serif',
+        ],
+        mono: [
+          'JetBrains Mono',
+          'Geist Mono',
+          'ui-monospace',
+          'SF Mono',
+          'Menlo',
+          'Consolas',
+          'monospace',
+        ],
       },
       boxShadow: {
-        'led-primary': '0 0 0 1px hsl(var(--primary) / 0.35), 0 0 12px -2px hsl(var(--led-shadow) / 0.6)',
+        'led-primary':
+          '0 0 0 1px hsl(var(--primary) / 0.35), 0 0 12px -2px hsl(var(--led-shadow) / 0.6)',
         'led-warn': '0 0 0 1px hsl(var(--warn) / 0.4), 0 0 12px -2px hsl(var(--warn) / 0.5)',
       },
       borderRadius: {

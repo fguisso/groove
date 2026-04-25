@@ -33,7 +33,7 @@ const voices: { key: 'hh' | 'sn' | 'kk'; label: string; kind: 'hat' | 'note' }[]
 const userWantsSticking = ref<boolean | null>(null)
 const hasAnySticking = computed(() => groove.value.sticking.some((s) => s !== '-'))
 const showSticking = computed(() =>
-  userWantsSticking.value !== null ? userWantsSticking.value : hasAnySticking.value
+  userWantsSticking.value !== null ? userWantsSticking.value : hasAnySticking.value,
 )
 
 function toggleSticking() {
@@ -77,7 +77,9 @@ function toggleSticking() {
       </template>
 
       <template v-for="v in voices" :key="v.key">
-        <div class="pr-3 flex items-center text-[10px] font-mono tracking-wider text-muted-foreground">
+        <div
+          class="pr-3 flex items-center text-[10px] font-mono tracking-wider text-muted-foreground"
+        >
           {{ v.label }}
         </div>
         <NoteCell
@@ -97,8 +99,8 @@ function toggleSticking() {
       Hi-hat: <span class="font-mono text-foreground">x</span> closed →
       <span class="font-mono text-foreground">o</span> open →
       <span class="font-mono text-warn">X</span> accent →
-      <span class="font-mono text-foreground">f</span> foot.
-      Snare / kick: <span class="font-mono text-foreground">●</span> normal →
+      <span class="font-mono text-foreground">f</span> foot. Snare / kick:
+      <span class="font-mono text-foreground">●</span> normal →
       <span class="font-mono text-warn">◆</span> accent →
       <span class="font-mono text-foreground">○</span> ghost.
     </p>

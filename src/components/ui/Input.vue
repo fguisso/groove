@@ -17,7 +17,7 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: string | number): void }>
         'transition-colors hover:border-border focus-visible:outline-none',
         'focus-visible:border-primary/60 focus-visible:ring-1 focus-visible:ring-primary/40',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        $props.class
+        $props.class,
       )
     "
     @input="(e) => emit('update:modelValue', (e.target as HTMLInputElement).value)"

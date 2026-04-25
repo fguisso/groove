@@ -30,9 +30,15 @@ function onClear() {
 
 <template>
   <header class="app-toolbar sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-2.5">
-    <a href="#/" class="flex items-center gap-2 text-foreground hover:text-primary transition-colors" aria-label="Go home">
+    <a
+      href="#/"
+      class="flex items-center gap-2 text-foreground hover:text-primary transition-colors"
+      aria-label="Go home"
+    >
       <GrooveLogo :width="84" />
-      <span class="hidden sm:inline text-[10px] font-mono uppercase tracking-widest text-muted-foreground border border-border rounded px-1.5 py-0.5">
+      <span
+        class="hidden sm:inline text-[10px] font-mono uppercase tracking-widest text-muted-foreground border border-border rounded px-1.5 py-0.5"
+      >
         v0.1
       </span>
     </a>
@@ -53,7 +59,12 @@ function onClear() {
     </div>
 
     <div class="flex items-center gap-1.5">
-      <Button variant="ghost" size="sm" title="Clear all notes — asks for confirmation" @click="onClear">
+      <Button
+        variant="ghost"
+        size="sm"
+        title="Clear all notes — asks for confirmation"
+        @click="onClear"
+      >
         <Trash2 class="h-3.5 w-3.5" /> Clear
       </Button>
       <Button variant="outline" size="sm" @click="$emit('exportPng')">
@@ -62,9 +73,7 @@ function onClear() {
       <Button variant="outline" size="sm" @click="$emit('exportMidi')">
         <Download class="h-3.5 w-3.5" /> MIDI
       </Button>
-      <Button size="sm" @click="$emit('share')">
-        <Share2 class="h-3.5 w-3.5" /> Share
-      </Button>
+      <Button size="sm" @click="$emit('share')"> <Share2 class="h-3.5 w-3.5" /> Share </Button>
     </div>
   </header>
 </template>

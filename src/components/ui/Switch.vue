@@ -14,10 +14,8 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
       cn(
         'relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors',
         'ring-1 ring-inset',
-        modelValue
-          ? 'bg-primary/90 ring-primary shadow-led-primary'
-          : 'bg-muted ring-border',
-        props.class
+        modelValue ? 'bg-primary/90 ring-primary shadow-led-primary' : 'bg-muted ring-border',
+        props.class,
       )
     "
     @click="emit('update:modelValue', !modelValue)"
@@ -27,7 +25,7 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
         cn(
           'pointer-events-none block h-3 w-3 rounded-full bg-background shadow',
           'transition-transform',
-          modelValue ? 'translate-x-3.5' : 'translate-x-0.5'
+          modelValue ? 'translate-x-3.5' : 'translate-x-0.5',
         )
       "
     />

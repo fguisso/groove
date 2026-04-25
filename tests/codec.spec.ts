@@ -29,7 +29,7 @@ describe('codec', () => {
           measures: 1 + Math.floor(Math.random() * 4),
           title: 'G' + iter,
           author: iter % 2 ? 'me' : '',
-        })
+        }),
       )
       for (let i = 0; i < g.voices.hh.length; i++) {
         g.voices.hh[i] = Math.floor(Math.random() * 5) as HatValue

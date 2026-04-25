@@ -45,7 +45,9 @@ const { groove } = storeToRefs(store)
     <div class="h-8 w-px bg-border" />
 
     <div class="flex items-center gap-2 min-w-[180px] flex-1">
-      <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14">Tempo</label>
+      <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
+        >Tempo</label
+      >
       <Slider
         :model-value="groove.tempo"
         :min="40"
@@ -56,7 +58,9 @@ const { groove } = storeToRefs(store)
     </div>
 
     <div v-if="!props.readOnly" class="flex items-center gap-2 min-w-[160px] flex-1">
-      <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14">Swing</label>
+      <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
+        >Swing</label
+      >
       <Slider
         :model-value="groove.swing"
         :min="0"
@@ -64,27 +68,41 @@ const { groove } = storeToRefs(store)
         :step="1"
         @update:model-value="store.setSwing($event)"
       />
-      <span class="font-mono tabular text-xs text-muted-foreground w-8 text-right">{{ groove.swing }}%</span>
+      <span class="font-mono tabular text-xs text-muted-foreground w-8 text-right"
+        >{{ groove.swing }}%</span
+      >
     </div>
 
     <div v-if="!props.readOnly" class="flex items-center gap-4 ml-auto">
       <label
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
-        :title="groove.loop ? 'Loop: on — click to stop looping' : 'Loop: off — play groove in a continuous loop'"
+        :title="
+          groove.loop
+            ? 'Loop: on — click to stop looping'
+            : 'Loop: off — play groove in a continuous loop'
+        "
       >
         <Repeat class="h-3.5 w-3.5" />
         <Switch :model-value="groove.loop" @update:model-value="store.toggleLoop()" />
       </label>
       <label
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
-        :title="groove.metronome ? 'Metronome: on — click to silence' : 'Metronome: off — click beats during playback'"
+        :title="
+          groove.metronome
+            ? 'Metronome: on — click to silence'
+            : 'Metronome: off — click beats during playback'
+        "
       >
         <MetronomeIcon class="h-3.5 w-3.5" />
         <Switch :model-value="groove.metronome" @update:model-value="store.toggleMetronome()" />
       </label>
       <label
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
-        :title="groove.countIn ? 'Count-in: on — click to disable the lead-in bar' : 'Count-in: off — play a bar of clicks before starting'"
+        :title="
+          groove.countIn
+            ? 'Count-in: on — click to disable the lead-in bar'
+            : 'Count-in: off — play a bar of clicks before starting'
+        "
       >
         <Waves class="h-3.5 w-3.5" />
         <Switch :model-value="groove.countIn" @update:model-value="store.toggleCountIn()" />

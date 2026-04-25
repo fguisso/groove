@@ -28,17 +28,17 @@ describe('comparison grooves', () => {
     }
 
     const payload = encode(g)
-    // eslint-disable-next-line no-console
+
     console.log('\n--- Groove URLs ---')
-    // eslint-disable-next-line no-console
+
     console.log('  payload         :', payload)
-    // eslint-disable-next-line no-console
+
     console.log('  payload length  :', payload.length, 'chars')
-    // eslint-disable-next-line no-console
+
     console.log('  editor (dev)    : http://localhost:5173/#/g/' + payload)
-    // eslint-disable-next-line no-console
+
     console.log('  embed readonly  : http://localhost:5173/#/embed/g/' + payload + '?ro=1')
-    // eslint-disable-next-line no-console
+
     console.log('  embed playable  : http://localhost:5173/#/embed/g/' + payload)
 
     const back = decode(payload)!

@@ -3,8 +3,10 @@ export async function exportPng(svg: SVGSVGElement, filename = 'groove') {
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
 
   const vb = clone.viewBox?.baseVal
-  const width = vb?.width || Number(clone.getAttribute('width')) || svg.getBoundingClientRect().width
-  const height = vb?.height || Number(clone.getAttribute('height')) || svg.getBoundingClientRect().height
+  const width =
+    vb?.width || Number(clone.getAttribute('width')) || svg.getBoundingClientRect().width
+  const height =
+    vb?.height || Number(clone.getAttribute('height')) || svg.getBoundingClientRect().height
   clone.setAttribute('width', String(width))
   clone.setAttribute('height', String(height))
 

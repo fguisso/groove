@@ -9,7 +9,7 @@ const props = withDefaults(
     disabled?: boolean
     type?: 'button' | 'submit'
   }>(),
-  { variant: 'default', size: 'md', type: 'button' }
+  { variant: 'default', size: 'md', type: 'button' },
 )
 
 const emit = defineEmits<{ (e: 'click', ev: MouseEvent): void }>()
@@ -27,16 +27,15 @@ const classes = computed(() =>
       outline:
         'border border-border bg-transparent hover:bg-accent/10 hover:text-accent hover:border-accent/40',
       ghost: 'hover:bg-muted text-muted-foreground hover:text-foreground',
-      destructive:
-        'bg-destructive text-destructive-foreground hover:brightness-110',
+      destructive: 'bg-destructive text-destructive-foreground hover:brightness-110',
     }[props.variant],
     {
       sm: 'h-7 px-2.5',
       md: 'h-8 px-3',
       lg: 'h-10 px-5',
       icon: 'h-9 w-9',
-    }[props.size]
-  )
+    }[props.size],
+  ),
 )
 </script>
 

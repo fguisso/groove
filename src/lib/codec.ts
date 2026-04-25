@@ -169,10 +169,7 @@ export function encode(g: Groove): string {
   w.writeByte(((g.timeSig[0] & 0x0f) << 4) | (g.timeSig[1] & 0x0f))
   w.writeByte(g.measures & 0xff)
   w.writeByte(
-    (divCode & 0x07) |
-      ((hasT1 ? 1 : 0) << 3) |
-      ((hasT4 ? 1 : 0) << 4) |
-      ((hasCy ? 1 : 0) << 5)
+    (divCode & 0x07) | ((hasT1 ? 1 : 0) << 3) | ((hasT4 ? 1 : 0) << 4) | ((hasCy ? 1 : 0) << 5),
   )
   w.writeByte(
     (g.metronome ? 1 : 0) |
@@ -181,7 +178,7 @@ export function encode(g: Groove): string {
       ((hhEmpty ? 1 : 0) << 3) |
       ((snEmpty ? 1 : 0) << 4) |
       ((kkEmpty ? 1 : 0) << 5) |
-      ((stEmpty ? 1 : 0) << 6)
+      ((stEmpty ? 1 : 0) << 6),
   )
 
   if (!hhEmpty) for (let i = 0; i < n; i++) w.writeBits(g.voices.hh[i] & 0x07, 3)

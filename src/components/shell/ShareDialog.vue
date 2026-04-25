@@ -14,12 +14,14 @@ const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 
 const payload = computed(() => encode(groove.value))
-const origin = computed(() => (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''))
+const origin = computed(() =>
+  typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '',
+)
 const shareUrl = computed(() => `${origin.value}#/g/${payload.value}`)
 const embedUrl = computed(() => `${origin.value}#/embed/g/${payload.value}`)
 const iframeSnippet = computed(
   () =>
-    `<iframe src="${embedUrl.value}" width="100%" height="300" frameborder="0" style="border:0" loading="lazy"></iframe>`
+    `<iframe src="${embedUrl.value}" width="100%" height="300" frameborder="0" style="border:0" loading="lazy"></iframe>`,
 )
 
 const copied = ref<string | null>(null)
@@ -38,7 +40,7 @@ watch(
   () => props.open,
   (v) => {
     if (!v) copied.value = null
-  }
+  },
 )
 </script>
 

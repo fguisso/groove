@@ -21,7 +21,7 @@ useUrlSync()
 const { isPlaying, currentStep, countInBeat, play, stop, updateRuntime } = usePlayback()
 watch(
   () => [groove.value.tempo, groove.value.swing],
-  () => updateRuntime(groove.value)
+  () => updateRuntime(groove.value),
 )
 
 const shareOpen = ref(false)
@@ -38,16 +38,14 @@ async function onExportPng() {
 
 <template>
   <div class="min-h-screen flex flex-col">
-    <TopBar
-      @share="shareOpen = true"
-      @export-midi="onExportMidi"
-      @export-png="onExportPng"
-    />
+    <TopBar @share="shareOpen = true" @export-midi="onExportMidi" @export-png="onExportPng" />
 
     <main class="flex-1 px-4 py-5 space-y-4 max-w-[1200px] w-full mx-auto">
       <div class="flex flex-wrap items-center gap-4 text-sm">
         <div class="flex items-center gap-2">
-          <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Division</label>
+          <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+            >Division</label
+          >
           <Select
             :model-value="groove.division"
             :options="DIVISIONS.map((d) => ({ label: String(d) + 'ths', value: d }))"
@@ -55,25 +53,27 @@ async function onExportPng() {
           />
         </div>
         <div class="flex items-center gap-2">
-          <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Measures</label>
+          <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+            >Measures</label
+          >
           <Select
             :model-value="groove.measures"
             :options="[1, 2, 3, 4].map((m) => ({ label: String(m), value: m }))"
             @update:model-value="store.setMeasures(Number($event))"
           />
         </div>
-        <div class="ml-auto flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+        <div
+          class="ml-auto flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+        >
           <span>Time</span>
-          <span class="text-foreground tabular">{{ groove.timeSig[0] }}/{{ groove.timeSig[1] }}</span>
+          <span class="text-foreground tabular"
+            >{{ groove.timeSig[0] }}/{{ groove.timeSig[1] }}</span
+          >
         </div>
       </div>
 
       <Score ref="scoreRef" :active-step="currentStep" />
-      <Transport
-        :is-playing="isPlaying"
-        @play="play(groove)"
-        @stop="stop()"
-      />
+      <Transport :is-playing="isPlaying" @play="play(groove)" @stop="stop()" />
       <GrooveGrid :active-step="currentStep" />
     </main>
 
@@ -105,11 +105,24 @@ async function onExportPng() {
 }
 
 @keyframes count-pulse {
-  0% { transform: scale(0.4); opacity: 0; }
-  35% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  35% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
-.count-fade-leave-active { transition: opacity 120ms ease-out; }
-.count-fade-leave-to { opacity: 0; }
+.count-fade-leave-active {
+  transition: opacity 120ms ease-out;
+}
+.count-fade-leave-to {
+  opacity: 0;
+}
 </style>

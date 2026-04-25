@@ -22,11 +22,13 @@ export function useUrlSync(opts: { writeBack?: boolean } = { writeBack: true }) 
         if (timer) clearTimeout(timer)
         timer = setTimeout(() => {
           const next = encode(g)
-          const name = route.name?.toString().startsWith('embed') ? 'embed-with-payload' : 'editor-with-payload'
+          const name = route.name?.toString().startsWith('embed')
+            ? 'embed-with-payload'
+            : 'editor-with-payload'
           router.replace({ name, params: { payload: next } })
         }, 300)
       },
-      { deep: true }
+      { deep: true },
     )
   }
 }

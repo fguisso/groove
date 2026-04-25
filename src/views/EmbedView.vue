@@ -53,12 +53,7 @@ watch(groove, postHeight, { deep: true })
       <span v-if="groove.author" class="text-muted-foreground"> — {{ groove.author }}</span>
     </div>
     <Score :active-step="currentStep" />
-    <Transport
-      :is-playing="isPlaying"
-      :read-only="readOnly"
-      @play="play(groove)"
-      @stop="stop()"
-    />
+    <Transport :is-playing="isPlaying" :read-only="readOnly" @play="play(groove)" @stop="stop()" />
 
     <Transition name="count-fade">
       <div
@@ -86,11 +81,24 @@ watch(groove, postHeight, { deep: true })
 }
 
 @keyframes count-pulse {
-  0% { transform: scale(0.4); opacity: 0; }
-  35% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  35% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
-.count-fade-leave-active { transition: opacity 120ms ease-out; }
-.count-fade-leave-to { opacity: 0; }
+.count-fade-leave-active {
+  transition: opacity 120ms ease-out;
+}
+.count-fade-leave-to {
+  opacity: 0;
+}
 </style>
