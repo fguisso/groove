@@ -14,6 +14,20 @@
       href="https://fonts.googleapis.com/css2?family=Didact+Gothic&family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
     <title>Groove — drum notation</title>
+    <script>
+      // Tianji analytics — only loads on the canonical hosted instance.
+      // Local dev, forks, and any self-hosted build skip this entirely.
+      // Self-hosters who'd rather not have it in their tree at all can
+      // delete this <script> block (or revert the commit that added it).
+      if (location.hostname === 'guisso.dev') {
+        var s = document.createElement('script')
+        s.async = true
+        s.defer = true
+        s.src = 'https://tc.guisso.dev/tracker.js'
+        s.setAttribute('data-website-id', 'cmii1ghp20egvjpnvi3fc0asv')
+        document.head.appendChild(s)
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>
