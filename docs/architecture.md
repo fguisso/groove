@@ -12,7 +12,6 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 - `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths.
 - `export-midi.ts` — `exportMidi(g)` writes a GM drum track (channel 10) via `@tonejs/midi`, looking up notes/velocities from the registry.
 - `export-png.ts` — score → PNG download.
-- `midi-grader.ts` — pure grading logic. `buildSchedule(g, startMs)` produces expected hits; `gradeHits(expected, actual, tol)` matches and grades; `summarize(report)` rolls up to a percentage.
 - `utils.ts` — `cn` class-merge helper.
 
 ### `src/composables/`
@@ -23,7 +22,7 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 ### `src/stores/`
 
 - `groove.ts` — Pinia store wrapping the current `Groove` plus a few editor-only flags.
-- `midi.ts` — Pinia store wrapping Web MIDI access, hit log, last-hit, latency/tolerance settings (persisted to `localStorage`), and practice/grading state. Shared by `MidiPanel` and `GrooveGrid`.
+- `midi.ts` — Pinia store wrapping Web MIDI access, last-hit, latency/tolerance settings (persisted to `localStorage`), the live-marker list, the practice-mode toggle + review timer, and the Settings drawer open flag. Shared by `MidiPanel`, `GrooveGrid`, `Score`, `TopBar`, and `EditorView`.
 
 ### `src/views/`
 
@@ -88,6 +87,6 @@ Source of truth: `src/lib/voices.ts`. Keep this table in sync if voices change.
 ## Known limitations
 
 - **Beam grouping assumes simple meters.** Compound meters render as straight eighths (`vex-builder.ts` TODO).
-- **MIDI grading is single-loop.** Hits past the first loop are still graded against loop 0's schedule.
-- **No per-cell visual feedback for MIDI grading.** Panel shows a numeric report; cell badges (correct/missed/wrong-voice) are a follow-up.
-- **No playback-timing tests.** Codec round-trip and grader logic are covered; the Tone.Part dispatch path is not. Add when behavior justifies it.
+- **No missed-note markers yet.** The live marker layer is purely hit-driven — expected notes the user fails to hit don't get a red dot. See the future-feature note in `docs/progress.md`.
+- **Marker timing snaps to `currentStep`.** The first attempt at timestamp-based positioning desynced; see the desync trap entry in `docs/progress.md` before trying again.
+- **No playback-timing tests.** Codec round-trip is covered; the `Tone.Part` dispatch path and the live marker watcher are not. Add when behavior justifies it.
