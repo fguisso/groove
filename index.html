@@ -19,12 +19,26 @@
       // Local dev, forks, and any self-hosted build skip this entirely.
       // Self-hosters who'd rather not have it in their tree at all can
       // delete this <script> block (or revert the commit that added it).
+      //
+      // Auto-track is OFF: by default Tianji wraps history.pushState /
+      // history.replaceState and fires a pageview on every change. The
+      // editor reencodes the groove into the URL hash on every cell
+      // edit (useUrlSync calls replaceState), which would spam the
+      // tracker. Instead we disable the wrapping and manually emit one
+      // pageview after the script loads — that records the visit
+      // without bookkeeping every keystroke.
       if (location.hostname === 'guisso.dev') {
         var s = document.createElement('script')
         s.async = true
         s.defer = true
         s.src = 'https://tc.guisso.dev/tracker.js'
         s.setAttribute('data-website-id', 'cmii1ghp20egvjpnvi3fc0asv')
+        s.setAttribute('data-auto-track', 'false')
+        s.onload = function () {
+          if (window.tianji && typeof window.tianji.track === 'function') {
+            window.tianji.track()
+          }
+        }
         document.head.appendChild(s)
       }
     </script>
