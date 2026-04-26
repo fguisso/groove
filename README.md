@@ -111,10 +111,13 @@ The relevant block in `index.html`:
 ```html
 <script>
   if (location.hostname === 'guisso.dev') {
-    /* injects https://tc.guisso.dev/tracker.js */
+    /* injects https://tc.guisso.dev/tracker.js with data-auto-track="false"
+       and emits one manual pageview on load. */
   }
 </script>
 ```
+
+Auto-tracking is disabled on purpose — Tianji's default behaviour wraps `history.pushState` / `history.replaceState`, and the editor rewrites the URL hash on every cell edit. With auto-tracking on, every keystroke would fire a pageview. Instead we record exactly one event per page load.
 
 If you would rather not have it in your tree at all, delete the block from `index.html` or revert the commit that introduced it (look for `chore: add Tianji analytics` in the log). Either is harmless — nothing else in the app depends on it.
 
