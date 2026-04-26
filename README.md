@@ -18,15 +18,29 @@ It also sparked my curiosity about the stack behind music software on the web: h
 
 **Notation that reads like a drum chart.** Beams group per beat, stems go up, notes at the same tick share a single stem, and empty space inside a beat is absorbed into the preceding note duration (a 16th followed by an empty slot becomes an 8th, and so on). A translucent marker follows playback through the score, sitting on the note currently ringing.
 
-**Cell-based input grid.** Click to cycle note states: normal, accent, ghost, open hat, pedal. Hi-hat, snare, and kick as separate lanes, with an optional sticking row for R, L, B. Visual gaps delimit beats inside each measure so the grid reads at a glance.
+**Cell-based input grid.** Click to cycle note states: normal, accent, ghost, open hat, pedal. Lanes for hi-hat, ride, three toms (high, mid, floor), snare, and kick, with an optional sticking row for R, L, B. Visual gaps delimit beats inside each measure so the grid reads at a glance.
 
-**Synthesized audio via Tone.js.** No samples to download. Kick is a tight membrane synth, snare mixes filtered noise with a tonal body, hi-hats are shaped from white noise through carefully tuned filters. Swing, loop, metronome, and count-in are all supported. The count-in shows a large on-screen counter so you know exactly when the groove enters.
+**Synthesized audio via Tone.js.** No samples to download. Kick is a tight membrane synth, snare mixes filtered noise with a tonal body, hi-hats are shaped from white noise through carefully tuned filters, toms are pitched membranes, ride is filtered noise plus a tonal partial. Swing, loop, metronome, and count-in are all supported. When count-in is on it plays before every loop iteration, not just the first, so practicing against the chart feels like a real warm-up. A large on-screen counter shows the count-in beats.
 
 **Short, shareable URLs.** State is packed into a compact binary format and base64url-encoded into the URL fragment. An empty groove is 11 characters. A typical 16-step rock beat fits in under 50. No server is involved at any point.
 
-**MIDI and PNG export.** Download the groove as a standard `.mid` file (GM drum mapping) or as a PNG of the rendered score.
+**MIDI input with live visual feedback.** Connect a MIDI drum device (the Aroma TDX 15S and similar e-kits work out of the box) and every hit drops a colored marker on the grid and on the staff in real time:
+
+- **Green** on the actual notehead, when you hit the right pad on the right beat.
+- **Amber** on the lane you played, when the timing was right but the pad was wrong.
+- **Red** on the lane you played, when nothing was expected at that step.
+
+A tolerance slider gives a small grace window so a hit slightly off the grid still counts. While playback is stopped, hitting a pad lights up its first grid cell so you can verify the device-to-voice mapping before practicing.
+
+**Settings drawer.** A side panel (open via the Settings button or the Settings shortcut) holds the MIDI gear: device connect/disconnect, latency offset and tolerance sliders, last-pad readout, the practice-mode toggle, and the MIDI/PNG export buttons.
+
+**Practice review mode.** Optional silent pause between loops (1–30 s, default 10) gives you a moment to study your hits before the next bar comes around. Markers stay on the staff and the grid for the whole review window; they clear at count-in 3 of the next loop. Pressing pause keeps the markers — only the next Play clears them.
+
+**MIDI and PNG export.** Download the groove as a standard `.mid` file (GM drum mapping) or as a PNG of the rendered score. Both buttons live inside the Settings drawer.
 
 **Light and dark themes.** Tuned to match the aesthetics of modern audio software.
+
+**Keyboard shortcut.** Press <kbd>Space</kbd> to play/pause. (The grid and inputs swallow the key when focused, so typing in a title field stays normal.)
 
 ## Stack
 
@@ -62,7 +76,6 @@ Things I want to get to, roughly in the order I think about them. No promises on
 Near term
 
 - [ ] Undo and redo.
-- [ ] Toms and cymbal ride lanes (the data model already supports `t1`, `t4`, `cy`; just needs UI and renderer wiring).
 - [ ] Triplet feel: make divisions 6, 12, 24 render as tuplets on the score instead of falling back to straight eighths.
 - [ ] More time signatures: 3/4, 2/4, 6/8 (beaming rules for compound meters).
 - [ ] Print friendly layout and PDF export.
@@ -73,18 +86,17 @@ Medium term
 - [ ] Grooves library: a small browsable set of named presets (rock, funk, shuffle, common fills), similar to the old GrooveScribe menu.
 - [ ] Per-measure variation inside a multi-bar groove (intro, verse, fill).
 - [ ] Click-and-drag to paint cells across a row.
-- [ ] Keyboard shortcuts.
+- [ ] More keyboard shortcuts on top of the existing <kbd>Space</kbd> for play/pause.
 
 Long term
 
-- [ ] Connect to an electronic kit over Web MIDI, so the app can listen to what I play on the pads, score it, and grade it. This is the destination: a self-hostable, open-source drum tutor.
-- [ ] Built-in lesson flow: a groove plus a metronome goal, a streak counter, and feedback when the notes I play match the chart.
+- [ ] Refine the MIDI tutor: missed-note markers (red dot on the expected notehead when nothing landed in the tolerance window), and an audio-clock-anchored timeline so timing offsets can drive sub-step horizontal placement on the staff. See `docs/progress.md` for the cautionary tale on the first attempt at this.
+- [ ] Built-in lesson flow on top of the live MIDI feedback: streak counter, per-bar accuracy summary, exit criteria.
 - [ ] Exercise templates with progressive tempo (start at 60 bpm, bump 2 bpm per successful loop).
 - [ ] Self-hosted sync of saved grooves across devices (optional, still no account by default).
 
 Maintenance
 
-- [ ] Swap remaining single-letter voice keys for a small named-voice abstraction so adding a new drum does not touch five files.
 - [ ] More codec test coverage (property-based round-trip fuzz).
 - [ ] Accessibility pass (keyboard nav of the cell grid, ARIA for the transport).
 

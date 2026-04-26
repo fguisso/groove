@@ -19,11 +19,11 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 - `usePlayback.ts` — owns Tone.js synth construction (kk, sn, hh closed/open/pedal, t1/t2/t3, ride, click), the `Tone.Part` scheduler, swing, count-in, and the playback `currentStep` ref. Voice dispatch reads `voices.ts`.
 - `useUrlSync.ts` — keeps the `Groove` store in sync with the hash payload. Editor writes back; embed does not.
-- `useMidiInput.ts` — Web MIDI wrapper. Requests access, listens to the first input, maps GM notes to voice ids via `voices.voiceForMidiNote()`, exposes hits with `performance.now()` timestamps.
 
 ### `src/stores/`
 
 - `groove.ts` — Pinia store wrapping the current `Groove` plus a few editor-only flags.
+- `midi.ts` — Pinia store wrapping Web MIDI access, hit log, last-hit, latency/tolerance settings (persisted to `localStorage`), and practice/grading state. Shared by `MidiPanel` and `GrooveGrid`.
 
 ### `src/views/`
 

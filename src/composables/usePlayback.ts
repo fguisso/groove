@@ -161,10 +161,18 @@ const ALL_SYNTH_KEYS: SynthKey[] = [
   'click',
 ]
 
+export interface PlayOptions {
+  // Silent gap inserted between loop iterations (in seconds). The countdown
+  // is exposed via `practiceTimerVal` so the UI can render numbers without
+  // any metronome click — pure visual review time.
+  practicePauseSec?: number
+}
+
 export function usePlayback() {
   const isPlaying = ref(false)
   const currentStep = ref(-1)
   const countInBeat = ref(0)
+  const practiceTimerVal = ref(0)
   const part = shallowRef<Tone.Part | null>(null)
   const players = shallowRef<Record<SynthKey, Trigger> | null>(null)
 
@@ -200,7 +208,7 @@ export function usePlayback() {
     }
   }
 
-  async function play(g: Groove) {
+  async function play(g: Groove, opts: PlayOptions = {}) {
     await Tone.start()
     const p = ensurePlayers()
     stopInternal()
@@ -214,15 +222,54 @@ export function usePlayback() {
     const stepsPerMeasure = g.division
 
     const beatSec = 60 / g.tempo
-    const countInLen = g.countIn ? beatsPerMeasure * beatSec : 0
-
-    const events: [string, { step: number }][] = []
     const stepSec = Tone.Time(stepDur).toSeconds()
-    for (let i = 0; i < n; i++) events.push([stepSec * i + '', { step: i }])
+    const countInLen = g.countIn ? beatsPerMeasure * beatSec : 0
+    const trackEnd = countInLen + stepSec * n
 
-    const newPart = new Tone.Part((time, ev: { step: number }) => {
+    // Practice pause is only meaningful when looping — it's the review window
+    // before the next iteration kicks off.
+    const pauseSec = g.loop ? Math.max(0, Math.floor(opts.practicePauseSec ?? 0)) : 0
+
+    // Single Part that contains count-in beats, track steps, and (optionally)
+    // a per-second timer countdown. Looping replays everything cleanly.
+    type Ev =
+      | { kind: 'count'; beat: number }
+      | { kind: 'step'; step: number }
+      | { kind: 'timer'; secLeft: number }
+    const events: [string, Ev][] = []
+    if (g.countIn) {
+      for (let i = 0; i < beatsPerMeasure; i++) {
+        events.push([i * beatSec + '', { kind: 'count', beat: i + 1 }])
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      events.push([countInLen + stepSec * i + '', { kind: 'step', step: i }])
+    }
+    for (let i = 0; i < pauseSec; i++) {
+      events.push([trackEnd + i + '', { kind: 'timer', secLeft: pauseSec - i }])
+    }
+
+    const newPart = new Tone.Part((time, ev: Ev) => {
+      if (ev.kind === 'count') {
+        p.click(time, ev.beat === 1 ? 1 : 0.6)
+        Tone.getDraw().schedule(() => {
+          countInBeat.value = ev.beat
+          practiceTimerVal.value = 0
+          currentStep.value = -1
+        }, time)
+        return
+      }
+
+      if (ev.kind === 'timer') {
+        Tone.getDraw().schedule(() => {
+          practiceTimerVal.value = ev.secLeft
+          countInBeat.value = 0
+          currentStep.value = -1
+        }, time)
+        return
+      }
+
       const step = ev.step
-
       for (const voice of VOICES) {
         const arr = g.voices[voice.id]
         if (!arr) continue
@@ -242,31 +289,16 @@ export function usePlayback() {
       }
 
       Tone.getDraw().schedule(() => {
+        countInBeat.value = 0
+        practiceTimerVal.value = 0
         currentStep.value = step
       }, time)
     }, events)
 
     newPart.loop = g.loop
-    newPart.loopEnd = stepSec * n + 's'
-    newPart.start(countInLen)
+    newPart.loopEnd = trackEnd + pauseSec + 's'
+    newPart.start(0)
     part.value = newPart
-
-    if (g.countIn) {
-      for (let i = 0; i < beatsPerMeasure; i++) {
-        const isFirst = i === 0
-        Tone.getTransport().scheduleOnce((time) => {
-          p.click(time, isFirst ? 1 : 0.6)
-          Tone.getDraw().schedule(() => {
-            countInBeat.value = i + 1
-          }, time)
-        }, i * beatSec)
-      }
-      Tone.getTransport().scheduleOnce((time) => {
-        Tone.getDraw().schedule(() => {
-          countInBeat.value = 0
-        }, time)
-      }, countInLen)
-    }
 
     Tone.getTransport().stop()
     Tone.getTransport().position = 0
@@ -288,6 +320,7 @@ export function usePlayback() {
     isPlaying.value = false
     currentStep.value = -1
     countInBeat.value = 0
+    practiceTimerVal.value = 0
   }
 
   function updateRuntime(g: Groove) {
@@ -300,5 +333,5 @@ export function usePlayback() {
     if (!v) currentStep.value = -1
   })
 
-  return { isPlaying, currentStep, countInBeat, play, stop, updateRuntime }
+  return { isPlaying, currentStep, countInBeat, practiceTimerVal, play, stop, updateRuntime }
 }

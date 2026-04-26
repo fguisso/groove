@@ -178,6 +178,70 @@
     outline-offset: 1px;
   }
 
+  /* Live MIDI hit feedback (used on first column when transport is stopped). */
+  .led-cell.live-hit {
+    animation: live-hit-pulse 250ms ease-out;
+    border-color: hsl(var(--primary));
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.55),
+      0 0 14px -2px hsl(var(--led-shadow) / 0.85);
+  }
+  .led-cell.live-hit:not(.filled) {
+    background: hsl(var(--primary) / 0.35);
+  }
+  @keyframes live-hit-pulse {
+    0% {
+      transform: scale(1.08);
+      box-shadow:
+        0 0 0 2px hsl(var(--primary) / 0.7),
+        0 0 18px -2px hsl(var(--led-shadow));
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* Live MIDI marker — colored dot dropped on the cell when a hit lands
+     during playback. Pulses in on appearance and stays visible until the
+     editor clears it (count-in 3 of next loop). Color encodes verdict. */
+  .led-cell.live-marker::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: live-marker-appear 220ms ease-out;
+  }
+  .led-cell.live-marker-on-time::after {
+    background: hsl(160 70% 45%);
+    box-shadow: 0 0 8px hsl(160 70% 45% / 0.85);
+  }
+  .led-cell.live-marker-wrong-voice::after {
+    background: hsl(var(--warn));
+    box-shadow: 0 0 8px hsl(var(--warn) / 0.85);
+  }
+  .led-cell.live-marker-off-time::after {
+    background: hsl(var(--destructive));
+    box-shadow: 0 0 8px hsl(var(--destructive) / 0.85);
+  }
+  @keyframes live-marker-appear {
+    0% {
+      opacity: 0;
+      transform: scale(2.2);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   .transport-play {
     @apply inline-flex items-center justify-center rounded-full transition;
     width: 2.75rem;

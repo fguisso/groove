@@ -13,7 +13,21 @@ import {
   Voice,
 } from 'vexflow'
 import type { Groove } from './model'
-import { VOICES } from './voices'
+import { VOICES, type VoiceId } from './voices'
+
+// Treble-clef line numbers per voice's `vexKey`. VexFlow's `getYForLine`
+// treats line 0 as the top staff line and line 4 as the bottom; spaces and
+// ledger positions are halves and negatives. Keeping this here means we
+// derive marker Y from the rendered stave instead of guessing percentages.
+const VOICE_LINE: Record<VoiceId, number> = {
+  hh: -0.5, // g/5/x2 — above top line
+  ride: 0, // f/5/x2 — top line
+  t1: 0.5, // e/5
+  t2: 1, // d/5
+  sn: 1.5, // c/5
+  t3: 2.5, // a/4
+  kk: 3.5, // f/4
+}
 
 // Map { stepsPerBeat: { span → VexFlow duration } }. Covers 4/4 with the
 // supported divisions. Dotted durations collapse "note + following empty"
@@ -177,6 +191,7 @@ export interface RenderResult {
   svg: SVGSVGElement | null
   height: number
   stepMarkers: StepMarker[] // one per step in the whole groove, pointing at the note that rings during that step
+  voiceY: Record<VoiceId, number> // exact Y in svg pixels per voice — drives live MIDI marker placement on the staff
 }
 
 export function renderScore(
@@ -200,11 +215,17 @@ export function renderScore(
   // Simple meters only for now — beat group = 1/4. TODO: 6/8 etc.
   const beatGroup = new Fraction(1, 4)
   const stepMarkers: StepMarker[] = []
+  const voiceY = {} as Record<VoiceId, number>
 
   for (let m = 0; m < measures; m++) {
     const stave = new Stave(20 + m * measureWidth, 56, measureWidth)
     if (m === 0) stave.addClef('percussion').addTimeSignature(`${g.timeSig[0]}/${g.timeSig[1]}`)
     stave.setContext(ctx).draw()
+
+    // Lines are identical across measures — capture Y once on the first stave.
+    if (m === 0) {
+      for (const v of VOICES) voiceY[v.id] = stave.getYForLine(VOICE_LINE[v.id])
+    }
 
     const measureStart = m * stepsPerMeasure
     const { builts, stepToBuiltIdx } = buildMainVoice(g, measureStart)
@@ -264,5 +285,6 @@ export function renderScore(
     svg: container.querySelector('svg') as SVGSVGElement | null,
     height,
     stepMarkers,
+    voiceY,
   }
 }
