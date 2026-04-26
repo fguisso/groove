@@ -1,164 +1,293 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useGrooveStore } from '@/stores/groove'
-import { useMidiInput } from '@/composables/useMidiInput'
-import { buildSchedule, gradeHits, summarize, type GradeReport } from '@/lib/midi-grader'
+import { Download, Image as ImageIcon, X } from 'lucide-vue-next'
+import { useMidiStore } from '@/stores/midi'
+import { VOICE_BY_ID } from '@/lib/voices'
 
-const store = useGrooveStore()
-const { groove } = storeToRefs(store)
+const midi = useMidiStore()
+const {
+  supported,
+  connected,
+  panelOpen,
+  error,
+  deviceName,
+  lastHit,
+  latencyMs,
+  toleranceMs,
+  practiceMode,
+  practiceTimerSec,
+} = storeToRefs(midi)
 
-const { supported, connected, error, deviceName, hits, connect, disconnect, clearHits } =
-  useMidiInput()
+defineEmits<{
+  (e: 'exportMidi'): void
+  (e: 'exportPng'): void
+}>()
 
-const LATENCY_KEY = 'groove:midiLatency'
-const TOLERANCE_KEY = 'groove:midiTolerance'
-
-const latencyMs = ref(readNumber(LATENCY_KEY, 0))
-const toleranceMs = ref(readNumber(TOLERANCE_KEY, 40))
-
-watchEffect(() => writeNumber(LATENCY_KEY, latencyMs.value))
-watchEffect(() => writeNumber(TOLERANCE_KEY, toleranceMs.value))
-
-function readNumber(key: string, fallback: number): number {
-  if (typeof localStorage === 'undefined') return fallback
-  const raw = localStorage.getItem(key)
-  const n = raw == null ? NaN : Number(raw)
-  return Number.isFinite(n) ? n : fallback
-}
-
-function writeNumber(key: string, v: number) {
-  if (typeof localStorage === 'undefined') return
-  localStorage.setItem(key, String(v))
-}
-
-const practicing = ref(false)
-const startedAtMs = ref(0)
-const report = ref<GradeReport | null>(null)
-
-function start() {
-  clearHits()
-  startedAtMs.value = performance.now()
-  practicing.value = true
-  report.value = null
-}
-
-function finish() {
-  practicing.value = false
-  const schedule = buildSchedule(groove.value, startedAtMs.value)
-  const adjusted = hits.value.map((h) => ({ voiceId: h.voiceId, atMs: h.atMs - latencyMs.value }))
-  report.value = gradeHits(schedule, adjusted, toleranceMs.value)
-}
-
-const summary = computed(() => (report.value ? summarize(report.value) : null))
+const lastHitVoiceLabel = computed(() =>
+  lastHit.value ? VOICE_BY_ID[lastHit.value.voiceId].label : null,
+)
 </script>
 
 <template>
-  <section class="panel space-y-3 p-3">
-    <header class="flex items-center justify-between">
-      <h3 class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-        Practice (MIDI)
-      </h3>
-      <span v-if="connected" class="text-[10px] font-mono text-primary">
-        {{ deviceName }}
-      </span>
-    </header>
+  <Transition name="midi-fade">
+    <div
+      v-if="panelOpen"
+      class="midi-backdrop fixed inset-0 z-40"
+      aria-hidden="true"
+      @click="midi.closePanel()"
+    />
+  </Transition>
 
-    <p v-if="!supported" class="text-xs text-warn">
-      Web MIDI is not supported in this browser. Try Chrome, Edge, or Firefox.
-    </p>
-
-    <div v-else-if="!connected" class="space-y-2">
-      <button
-        type="button"
-        class="rounded-md border bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
-        @click="connect"
-      >
-        Connect MIDI device
-      </button>
-      <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-    </div>
-
-    <div v-else class="space-y-3">
-      <div class="grid grid-cols-2 gap-3 text-xs">
-        <label class="space-y-1">
-          <span class="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Latency offset (ms)
+  <Transition name="midi-slide">
+    <aside
+      v-if="panelOpen"
+      class="midi-drawer fixed right-0 top-0 z-50 flex h-full w-[min(92vw,400px)] flex-col gap-5 border-l bg-card p-4 shadow-2xl overflow-y-auto"
+      role="dialog"
+      aria-label="Settings"
+    >
+      <header class="flex items-center justify-between">
+        <h3 class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          Settings
+        </h3>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="connected"
+            class="inline-flex items-center gap-1.5 text-[10px] font-mono text-primary"
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
+            />
+            live
           </span>
-          <input
-            v-model.number="latencyMs"
-            type="number"
-            class="w-full rounded-md border bg-background px-2 py-1 font-mono"
-            step="5"
-          />
-        </label>
-        <label class="space-y-1">
-          <span class="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Tolerance (ms)
-          </span>
-          <input
-            v-model.number="toleranceMs"
-            type="number"
-            min="10"
-            max="200"
-            step="5"
-            class="w-full rounded-md border bg-background px-2 py-1 font-mono"
-          />
-        </label>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button
-          v-if="!practicing"
-          type="button"
-          class="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110"
-          @click="start"
-        >
-          Start practice
-        </button>
-        <button
-          v-else
-          type="button"
-          class="rounded-md bg-warn px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110"
-          @click="finish"
-        >
-          Finish ({{ hits.length }} hits)
-        </button>
-        <button
-          type="button"
-          class="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-          @click="disconnect"
-        >
-          Disconnect
-        </button>
-      </div>
-
-      <div v-if="summary" class="rounded-md border bg-muted/30 p-2 text-xs">
-        <div class="flex items-baseline gap-2">
-          <span class="font-mono text-2xl font-semibold tabular text-primary">
-            {{ summary.score }}%
-          </span>
-          <span class="text-muted-foreground">accuracy</span>
+          <button
+            type="button"
+            class="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Close panel"
+            @click="midi.closePanel()"
+          >
+            <X class="h-4 w-4" />
+          </button>
         </div>
-        <dl class="mt-2 grid grid-cols-2 gap-x-4 font-mono text-[11px]">
-          <div class="flex justify-between">
-            <dt class="text-muted-foreground">correct</dt>
-            <dd>{{ summary.correct }}</dd>
+      </header>
+
+      <!-- Export -->
+      <section class="space-y-2">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Export</h4>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs hover:bg-muted"
+            @click="$emit('exportPng')"
+          >
+            <ImageIcon class="h-3.5 w-3.5" /> PNG
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs hover:bg-muted"
+            @click="$emit('exportMidi')"
+          >
+            <Download class="h-3.5 w-3.5" /> MIDI
+          </button>
+        </div>
+      </section>
+
+      <!-- MIDI Device -->
+      <section class="space-y-2">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          MIDI device
+        </h4>
+        <p v-if="!supported" class="text-xs text-warn">
+          Web MIDI is not available here. Needs Chrome/Edge/Firefox or Safari 18+ over HTTPS.
+        </p>
+        <div v-else-if="!connected" class="space-y-2">
+          <button
+            type="button"
+            class="w-full rounded-md border bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
+            @click="midi.connect()"
+          >
+            Connect MIDI device
+          </button>
+          <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+        </div>
+        <div v-else class="space-y-2">
+          <div class="rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs font-mono">
+            {{ deviceName }}
           </div>
-          <div class="flex justify-between">
-            <dt class="text-muted-foreground">missed</dt>
-            <dd>{{ summary.missed }}</dd>
+          <button
+            type="button"
+            class="w-full rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+            @click="midi.disconnect()"
+          >
+            Disconnect
+          </button>
+          <p class="text-[11px] leading-snug text-muted-foreground">
+            Hits during play drop colored markers on the grid and the tablature. Markers stay until
+            the next loop restarts.
+          </p>
+        </div>
+      </section>
+
+      <!-- MIDI tuning -->
+      <section v-if="connected" class="space-y-3">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          MIDI tuning
+        </h4>
+        <div class="space-y-3 text-xs">
+          <label class="block space-y-1">
+            <div class="flex items-baseline justify-between">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                Latency offset
+              </span>
+              <span class="font-mono tabular text-[10px] text-muted-foreground">
+                {{ latencyMs }} ms
+              </span>
+            </div>
+            <input
+              :value="latencyMs"
+              type="range"
+              min="-100"
+              max="100"
+              step="5"
+              class="w-full accent-[hsl(var(--primary))]"
+              @input="midi.setLatency(Number(($event.target as HTMLInputElement).value))"
+            />
+          </label>
+          <label class="block space-y-1">
+            <div class="flex items-baseline justify-between">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                Tolerance
+              </span>
+              <span class="font-mono tabular text-[10px] text-muted-foreground">
+                ±{{ toleranceMs }} ms
+              </span>
+            </div>
+            <input
+              :value="toleranceMs"
+              type="range"
+              min="10"
+              max="200"
+              step="5"
+              class="w-full accent-[hsl(var(--primary))]"
+              @input="midi.setTolerance(Number(($event.target as HTMLInputElement).value))"
+            />
+          </label>
+        </div>
+      </section>
+
+      <!-- MIDI practice -->
+      <section class="space-y-2">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          MIDI practice
+        </h4>
+        <label class="flex items-start gap-2 text-xs">
+          <input
+            type="checkbox"
+            :checked="practiceMode"
+            class="mt-0.5 accent-[hsl(var(--primary))]"
+            @change="midi.setPracticeMode(($event.target as HTMLInputElement).checked)"
+          />
+          <span class="leading-snug">
+            Pause between loops
+            <span class="block text-[11px] text-muted-foreground">
+              Holds the markers for review and silently counts down before the next bar.
+              <br />Pause keeps your markers; only Play clears them.
+            </span>
+          </span>
+        </label>
+        <div v-if="practiceMode" class="space-y-1 pl-6 text-xs">
+          <div class="flex items-baseline justify-between">
+            <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              Review time
+            </span>
+            <span class="font-mono tabular text-[10px] text-muted-foreground">
+              {{ practiceTimerSec }} s
+            </span>
           </div>
-          <div class="flex justify-between">
-            <dt class="text-muted-foreground">wrong voice</dt>
-            <dd>{{ summary.wrongVoice }}</dd>
+          <input
+            :value="practiceTimerSec"
+            type="range"
+            min="1"
+            max="30"
+            step="1"
+            class="w-full accent-[hsl(var(--primary))]"
+            @input="midi.setPracticeTimerSec(Number(($event.target as HTMLInputElement).value))"
+          />
+        </div>
+      </section>
+
+      <!-- Last pad -->
+      <section v-if="connected" class="space-y-2">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Last pad
+        </h4>
+        <div class="rounded-md border bg-muted/20 px-3 py-2">
+          <div v-if="lastHit" class="space-y-1">
+            <div class="flex items-baseline justify-between">
+              <span class="text-sm font-semibold">{{ lastHitVoiceLabel }}</span>
+              <span class="font-mono tabular text-[10px] text-muted-foreground">
+                GM {{ lastHit.rawNote }}
+              </span>
+            </div>
+            <div class="h-1 w-full overflow-hidden rounded-full bg-border">
+              <div
+                class="h-full bg-primary transition-[width] duration-100"
+                :style="{ width: Math.round(lastHit.velocity * 100) + '%' }"
+              />
+            </div>
           </div>
-          <div class="flex justify-between">
-            <dt class="text-muted-foreground">extras</dt>
-            <dd>{{ summary.extras }}</dd>
+          <p v-else class="text-[11px] text-muted-foreground">
+            Hit any pad to verify it maps to the right voice.
+          </p>
+        </div>
+      </section>
+
+      <!-- Shortcuts -->
+      <section class="space-y-2">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Shortcuts
+        </h4>
+        <dl class="space-y-1 text-[11px]">
+          <div class="flex items-center justify-between">
+            <dt class="text-muted-foreground">Play / pause</dt>
+            <dd>
+              <kbd
+                class="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground"
+              >
+                Space
+              </kbd>
+            </dd>
           </div>
         </dl>
-      </div>
-    </div>
-  </section>
+      </section>
+    </aside>
+  </Transition>
 </template>
+
+<style scoped>
+.midi-backdrop {
+  background: hsl(var(--foreground) / 0.35);
+  backdrop-filter: blur(2px);
+}
+
+.midi-fade-enter-active,
+.midi-fade-leave-active {
+  transition: opacity 160ms ease-out;
+}
+.midi-fade-enter-from,
+.midi-fade-leave-to {
+  opacity: 0;
+}
+
+.midi-slide-enter-active,
+.midi-slide-leave-active {
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 220ms ease-out;
+}
+.midi-slide-enter-from,
+.midi-slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0.6;
+}
+</style>

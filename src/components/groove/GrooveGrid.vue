@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
+import { useMidiStore, type LiveMarkerGrade } from '@/stores/midi'
 import { VOICE_BY_ID, type VoiceId } from '@/lib/voices'
 import NoteCell from './NoteCell.vue'
 
-const props = defineProps<{ activeStep?: number }>()
+const props = defineProps<{ activeStep?: number; isPlaying?: boolean }>()
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
+const midi = useMidiStore()
 
 const cols = computed(() => groove.value.voices.hh?.length ?? 0)
 const perBeat = computed(() => groove.value.division / (groove.value.timeSig[1] === 8 ? 2 : 1))
@@ -29,8 +31,6 @@ const lanes = VISIBLE_LANES.map((id) => {
   return { key: id, label: v.label, kind: v.kind }
 })
 
-// null = never toggled → follow auto (show if any sticking values exist)
-// true/false = explicit user choice, overrides auto
 const userWantsSticking = ref<boolean | null>(null)
 const hasAnySticking = computed(() => groove.value.sticking.some((s) => s !== '-'))
 const showSticking = computed(() =>
@@ -39,6 +39,49 @@ const showSticking = computed(() =>
 
 function toggleSticking() {
   userWantsSticking.value = !showSticking.value
+}
+
+// Live pad feedback: when playback is stopped and MIDI is connected, the
+// step-0 cell of the matching lane lights up briefly so the user can verify
+// pad → voice mapping by ear AND eye.
+const LIVE_HIT_MS = 250
+const recentlyHit = ref<Record<string, number>>({})
+const showLiveMonitor = computed(() => midi.connected && !props.isPlaying)
+
+watch(
+  () => midi.lastHit,
+  (h) => {
+    if (!h) return
+    const t = h.atMs
+    recentlyHit.value = { ...recentlyHit.value, [h.voiceId]: t }
+    setTimeout(() => {
+      if (recentlyHit.value[h.voiceId] === t) {
+        const next = { ...recentlyHit.value }
+        delete next[h.voiceId]
+        recentlyHit.value = next
+      }
+    }, LIVE_HIT_MS)
+  },
+)
+
+function liveHitFor(voiceId: VoiceId, step: number): boolean {
+  if (!showLiveMonitor.value) return false
+  if (step !== 0) return false
+  return recentlyHit.value[voiceId] !== undefined
+}
+
+// Per-(voice, step) live marker — the most recent marker wins so a fast
+// double on the same cell still shows the latest verdict.
+const liveMarkerByCell = computed<Record<string, LiveMarkerGrade>>(() => {
+  const out: Record<string, LiveMarkerGrade> = {}
+  for (const m of midi.markers) {
+    out[`${m.voiceId}-${m.step}`] = m.grade
+  }
+  return out
+})
+
+function liveMarkerFor(voiceId: VoiceId, step: number): LiveMarkerGrade | undefined {
+  return liveMarkerByCell.value[`${voiceId}-${step}`]
 }
 </script>
 
@@ -93,6 +136,8 @@ function toggleSticking() {
           :downbeat="isDownbeat(i - 1)"
           :beat-start="i - 1 > 0 && isBeat(i - 1)"
           :active="props.activeStep === i - 1"
+          :live-hit="liveHitFor(v.key, i - 1)"
+          :live-marker="liveMarkerFor(v.key, i - 1)"
           @click="store.cycleCell(v.key, i - 1)"
         />
       </template>

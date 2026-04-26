@@ -4,6 +4,170 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-04-26 — Score markers aligned to actual notes
+
+**Status:** Live MIDI markers on the staff now sit on top of the real noteheads (per voice), are bigger, borderless, and semi-transparent so the underlying note glyph reads through.
+
+**Done:**
+
+- `vex-builder.ts` now returns `voiceY: Record<VoiceId, number>` from `renderScore`. Each voice's Y is captured from `stave.getYForLine(...)` on the first measure's stave, using a `VOICE_LINE` table keyed off each voice's `vexKey` (e.g. `hh: -0.5` above the top line, `kk: 3.5` near the bottom).
+- `Score.vue` consumes `voiceY` instead of the `VOICE_Y_PCT` percentage hack that was floating dots above the staff. Removed the table from the component entirely.
+- Live marker style: 18×18 (was 12×12), no white border, fill drops to ~55 % alpha. Glow box-shadow keeps grade legible.
+
+**Decisions:**
+
+- **Capture once on measure 0.** Lines are identical across measures; iterating wastes work and risks the wrong stave winning if VexFlow reflows.
+- **Semi-transparent on purpose.** The user wants to see if the marker is sitting on the actual notehead — opaque dots hide that, defeating the alignment check.
+- **Voice line table colocated with vex-builder.** It has to stay in sync with each voice's `vexKey`; living next to the renderer makes that obvious.
+
+**Next:** End-to-end pass on a real e-kit. If timing-on-the-staff (early/late) becomes desired, see the cautionary note below before reaching for `performance.now()` again.
+
+**Future feature — missed-note markers:** Currently the live marker layer is purely hit-driven (every MIDI hit becomes a marker, graded vs. the programmed step). It does not surface _expected notes that the user failed to hit_. Add a note-driven pass: as each step plays (or once the tolerance window past it closes), check whether any in-window hit matched the expected voice; if not, drop a red marker on the unhit notehead. Implementation hinges on a stable per-step "expected vs. landed" map — likely best built once we have the audio-clock-anchored timeline (see the desync trap entry below) so the matching window is precise.
+
+---
+
+## 2026-04-26 — Reverted: timestamp-based marker positions (desync trap)
+
+**Status:** Reverted. The plan was sound on paper, the result was visibly out of sync. Leaving this note so the next attempt doesn't repeat the same mistake.
+
+**What was tried:**
+
+- Captured `playbackStartedAtMs = performance.now()` right before `Tone.getTransport().start()`, exposed it from `usePlayback`.
+- In the `lastHit` watcher, computed `elapsed = h.atMs - startMs - latencyMs`, modulo loop length, derived a `floatStep`, rounded to a logical step, applied a tolerance grace window, and stored `floatStep` on the marker so `Score.vue` could offset the circle horizontally for microtiming.
+
+**Why it broke synchronization:**
+
+- **`performance.now()` and the audio clock are not aligned.** Tone schedules with a lookahead (~100 ms by default) and the AudioContext's `currentTime` runs on a separate clock. Snapping a wall-clock anchor right before `transport.start()` means every elapsed calculation is off by the lookahead, plus jitter from the main thread.
+- **`latencyMs` couldn't paper over it.** The user's latency slider was meant to compensate for kit→browser MIDI delay only. With timestamp-based positioning it also had to absorb the Tone lookahead and any scheduler drift, which made the slider's "right value" untethered from the physical hookup.
+- **Modulo + negative elapsed = wrong loop.** When `latencyMs > 0` the first few hits in each loop produced negative `elapsed`, which the modulo flipped to the _previous_ loop's window — markers landed at the wrong end of the bar.
+- **Mid-play config changes broke the math.** Tempo / measure / practice-mode toggles changed `totalLoopMs` without re-anchoring `playbackStartedAtMs`, so subsequent markers drifted progressively.
+
+**What to do next time:**
+
+- Use the audio clock (`Tone.now()` / `Tone.getTransport().seconds`) as the anchor, not `performance.now()`. The MIDI hit timestamp can be projected onto the transport timeline via `Tone.getContext().now()` at receive time.
+- Or stay with `currentStep` snapping (lossy but stable) and add microtiming as a _separate_ visual that comes from the next hit's offset relative to the _next_ `Tone.getDraw().schedule` boundary, not from independent wall-clock math.
+- Re-anchor on every `play()` AND every config change that affects loop length (`updateRuntime` should also reset the anchor and recompute).
+- Treat this as an audio-engineering problem first, not a math problem. Write a small calibration test (loop a known pattern, click a UI button on the metronome, measure the offset) before wiring anything to the visualization layer.
+
+**Files left untouched after revert:** `midi.ts`, `usePlayback.ts`, `Score.vue`, `EditorView.vue` are back to the previous, working state. Nothing to clean up.
+
+---
+
+## 2026-04-26 — Practice pause + Space shortcut + sticky markers on pause
+
+**Status:** Optional review window between loop iterations and a fix to the play/pause shortcut.
+
+**Done:**
+
+- **Space replaces Esc** as the global play/pause shortcut. Switched detection to `e.code === 'Space'`. Settings drawer's Shortcuts section relabeled to `Space`.
+- **MIDI practice mode (off by default).** New section in the Settings drawer with a checkbox + a 1–30 s slider (default 10 s). Both persisted to `localStorage` (`groove:midiPracticeMode`, `groove:midiPracticeSec`).
+- **Silent pause between loops.** `usePlayback.play(g, { practicePauseSec })` schedules a per-second `timer` event series in the same `Tone.Part` after the track's last step. No metronome — just a `practiceTimerVal` ref counting down from N to 1. Loop-end extends to `trackEnd + pauseSec`. Pause is ignored when `g.loop` is false.
+- **Review countdown overlay.** EditorView shows a teal/primary `practice-timer-number` (slightly smaller than the count-in glyph) with a "review" caption above it. Reuses the count-pulse keyframe.
+- **Sticky markers on Pause.** Added `onPlay` / `onStop` wrappers in EditorView. Play always clears markers (fresh start). Stop only clears when `practiceMode` is off — practice mode keeps the verdicts on screen so the user can study after pausing. `lastTrackStep` was introduced so the no-count-in step-wrap detector ignores the `-1` transitions during the practice pause.
+
+**Decisions:**
+
+- **Pause coupled to loop only.** A practice pause without `g.loop = true` leaves the player staring at a dead screen; we just no-op it instead.
+- **Single `Tone.Part` for everything.** Count-in beats + steps + timer ticks all share one part, so looping replays the whole sequence atomically. Avoids juggling multiple scheduled timelines.
+- **Distinct color for the review countdown.** Teal vs. count-in's red so the user instantly reads "you're in review, not about to be on".
+- **Markers cleared on Play, not on Stop.** This way the user's review can outlive a pause; only an intentional restart wipes the slate.
+
+**Next:** Real e-kit pass; consider adding a brief audio cue at "1" of the review countdown so the player knows the next bar is imminent.
+
+---
+
+## 2026-04-26 — Drawer becomes Settings, persistent markers, looping count-in, ESC shortcut
+
+**Status:** Practice/grading flow gone; the right drawer is now a general Settings panel; MIDI feedback markers stay on the grid and tablature for an entire bar; count-in plays before every loop; ESC is the one keyboard shortcut.
+
+**Done:**
+
+- **Practice flow removed.** Midi store dropped `practicing`, `startedAtMs`, `finalReport`, `startPractice`, `finishPractice`, `computeReport`, and `hits` (only `lastHit` matters now). `GrooveGrid` no longer computes a `gradeMap`, and `NoteCell` no longer carries a `grade` prop. `tailwind.css` lost the `.grade-correct/.grade-wrong/.grade-missed` outlines.
+- **Drawer = Settings.** `MidiPanel.vue` re-titled "Settings". Sections: Export (PNG / MIDI), MIDI device, MIDI tuning, Last pad, Shortcuts. The export buttons in `TopBar` were removed (top bar now: Clear · Settings · Share). MidiPanel emits `exportMidi` / `exportPng` to EditorView, which still owns the score ref for PNG.
+- **Looping count-in.** `usePlayback.ts` now folds count-in beats into the same `Tone.Part` as the track steps. Looping the part replays count-in before every iteration, matching a real practice flow. `loopEnd = countInLen + n × stepSec`.
+- **Persistent markers.** Removed the 800 ms TTL in `pushMarker`. Markers stay visible until the editor explicitly calls `clearMarkers()`. `EditorView` clears them on `countInBeat === 3` (count-in path) or when `currentStep` wraps from `>0` back to `0` (no-count-in loop). Animations on the grid dot and the score circle changed from fade-out to one-shot pulse-in (220 ms) that resolves to a stable visible state.
+- **ESC = play/pause.** Single global keydown listener in `EditorView`; ignored if focus is in an input/textarea/contenteditable. The previous "ESC closes drawer" handler in `MidiPanel` is gone.
+
+**Decisions:**
+
+- **Count-in inside the part, not as a separate `scheduleOnce` block.** Lets us loop the whole count+track without coordinating two timelines. Cost: count-in events fire as part of the part's draw schedule, so the user-visible `countInBeat` resets to 0 only when the first `step` event fires.
+- **Markers cleared at count-in 3, not 1.** Gives the player two count beats to look at the verdict before the next bar starts. With count-in off, we fall back to wrapping `currentStep`.
+- **Single shortcut on purpose.** Adding more (Space, R, etc.) was tempting; the user explicitly asked for one. Easy to extend later.
+- **MIDI tuning sliders kept** even though no grading consumer uses them now. They're cheap UI and we'll wire them back when a grading view returns.
+
+**Next:** End-to-end with the e-kit. Open follow-ups: marker persistence has no per-loop history (last loop's markers replace previous, can't compare bars over time); the `midi-grader` lib is now unused outside tests — keep or remove next pass.
+
+---
+
+## 2026-04-25 — Live MIDI markers on grid and tablature
+
+**Status:** Every MIDI hit during playback now leaves a short-lived dot on the matching grid cell AND a colored circle on the staff, so the user can see in real time whether they nailed the timing/pad.
+
+**Done:**
+
+- Midi store: new `LiveMarker { id, voiceId, step, atMs, grade }` type with `grade ∈ { 'on-time', 'wrong-voice', 'off-time' }`, plus `markers` ref, `pushMarker`, `clearMarkers`. Markers auto-decay after 800 ms via `setTimeout`.
+- `EditorView`: watches `midi.lastHit` and, while `isPlaying`, snaps the hit to `currentStep`, classifies it (`on-time` if the programmed groove has that voice firing here; `wrong-voice` if any other voice is expected; `off-time` if nothing is expected), and pushes a marker. `clearMarkers()` runs on stop so stale dots don't linger.
+- `GrooveGrid` reads `markers` and forwards a per-cell `liveMarker` grade to `NoteCell`.
+- `NoteCell` + `tailwind.css`: a small filled dot in the bottom-right corner of the cell, color-coded by grade, with an 800 ms scale/fade keyframe (`live-marker-fade`). Distinct from `live-hit` (column-0 verification glow) and from `grade-correct/wrong/missed` (practice-mode outlines).
+- `Score.vue`: an absolutely-positioned circle is drawn at `stepMarkers[step].x + width/2`, with Y derived from a per-voice `VOICE_Y_PCT` mapping (rough staff-position approximation). Circles fade out via `score-marker-fade` over 800 ms.
+
+**Decisions:**
+
+- **Snap to `currentStep`, not to a tolerance window.** The cell granularity already encodes "near miss" via wrong-voice/off-time. Refining timing into "early/late by N ms" is a future step (and would conflict with the existing tolerance setting in practice grading).
+- **Live markers are independent of practice mode.** They fire whenever playback runs and a device is connected — no Start/Finish required. Keeps the feature usable as casual visual feedback while jamming.
+- **Three grade colors reused everywhere.** Green = on-time, amber = wrong-voice, red = off-time. Matches the practice-mode outline colors so users learn one palette.
+- **Voice on staff via Y-percentage table.** Pulling exact note-head Y out of VexFlow is brittle; a coarse percentage map is good enough for a "the kick dot lands near the bottom" read.
+
+**Next:** End-to-end with a real e-kit. Open follow-ups: snapping doesn't surface early/late timing; markers don't survive across loop boundaries (cleared on stop only).
+
+---
+
+## 2026-04-25 — MIDI drawer overlay + supported-flag fix
+
+**Status:** MIDI panel now hidden by default and opens as a right-side drawer over the editor. Bug fix: panel was always reporting "Web MIDI not supported" even on Chrome.
+
+**Done:**
+
+- Bug fix in `src/stores/midi.ts`: `supported` was a plain `const` returned from the setup store, which `storeToRefs` silently drops (only refs/computed survive destructuring). The destructured `supported` in `MidiPanel` was therefore `undefined`, making `v-if="!supported"` always true. Wrapped in `ref(...)`. Also exposed `panelOpen` + `openPanel/closePanel/togglePanel`.
+- `MidiPanel.vue` rewritten as a fixed `position: fixed` drawer with a backdrop, slide-in animation from the right, ESC to close, click-outside to dismiss. The editor layout itself is untouched.
+- `EditorView.vue` reverted to its original single-column layout — the drawer is mounted as a sibling to `<main>` so it overlays without affecting the existing flow.
+- `TopBar.vue` gained a `MIDI` button (with a small green dot when a device is connected) that calls `midi.togglePanel()`.
+
+**Decisions:**
+
+- **Drawer over sidebar.** First pass put MIDI in a sticky right column, but the user wanted the editor's CSS untouched and the panel hidden until explicitly opened. Drawer is the natural fit.
+- **Open state lives in the store.** `panelOpen` next to the rest of the MIDI state means TopBar can toggle without prop-drilling and any other component (e.g. a future "Connect & start" CTA) can open the drawer too.
+- **Live cell feedback stays independent of the panel.** `GrooveGrid` reads `lastHit`/grade map straight from the store, so the column-0 monitor and per-cell grading still work whether the drawer is open or closed.
+- **Trigger lives in TopBar, not as a floating button.** Keeps with existing chrome and avoids a stray FAB.
+
+**Next:** Live e-kit verification of the supported-flag fix and the drawer flow.
+
+---
+
+## 2026-04-25 — MIDI sidebar + in-grid feedback
+
+**Status:** MIDI controls live in a wide right sidebar. The grid now doubles as the live pad monitor and the grading display.
+
+**Done:**
+
+- New `src/stores/midi.ts` — Pinia store owning Web MIDI access, hits, last-hit, latency/tolerance settings (persisted in `localStorage`), practice state, and final report. Replaces `src/composables/useMidiInput.ts` (deleted).
+- `MidiPanel.vue` rewritten as a tall, sticky right-column sidebar with sections: Device · Settings (range sliders for latency/tolerance) · Last pad (voice label + GM note + velocity bar) · Practice · Score summary.
+- `EditorView.vue` switched to a two-column layout (`flex-col lg:flex-row`); main column holds editor controls/score/transport/grid, right column hosts `MidiPanel` (`lg:w-[360px]` sticky to top).
+- `GrooveGrid.vue` now reads the MIDI store. When playback is stopped and a device is connected, each incoming pad pulses the matching voice's step-0 cell for ~250 ms — verifies pad→voice mapping without leaving the grid. During practice it computes a live grade map (recomputed per hit); after Finish the frozen `finalReport` drives the same map.
+- `NoteCell.vue` accepts `liveHit` and `grade` props; `tailwind.css` adds a `live-hit` pulse animation and `grade-correct/wrong/missed` outlines (green/amber/red dashed).
+
+**Decisions:**
+
+- **Grid column 0 reused as the live monitor.** No separate strip. When the user is connected but not practicing/playing, hitting a pad blinks the corresponding voice's first cell — works on empty cells too via a tinted background.
+- **Grade map is live during practice.** `gradeHits` is greedy and stable over a sorted hit array, so recomputing on every store mutation gives correct partial state without breaking the final report.
+- **State moved to a Pinia store.** Multiple components (`MidiPanel`, `GrooveGrid`) need the same hits/lastHit/settings; a shared store is cleaner than provide/inject or prop drilling.
+- **Sliders, not number inputs.** Range inputs read better in a dense sidebar and avoid the spinner-driven typo problem when dialing latency.
+- **Sidebar collapses on small screens.** `lg:` breakpoint puts the sidebar below the editor on narrow viewports; sticky-top behavior is `lg:` only.
+
+**Next:** End-to-end verification with a real e-kit. Open follow-ups: extras have no in-grid representation (still a numeric-only count); multi-loop grading still uses loop-0 schedule.
+
+---
+
 ## 2026-04-25 — Phase 3 complete (MVP — needs e-kit verification)
 
 **Status:** Web MIDI listener, grader, and practice panel landed. Logic is unit-tested. End-to-end verification requires a connected e-drum kit and a supported browser; the user owns this.

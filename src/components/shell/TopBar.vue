@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { Share2, Download, Image as ImageIcon, Trash2 } from 'lucide-vue-next'
+import { Share2, Trash2, Settings } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import GrooveLogo from '@/components/shell/GrooveLogo.vue'
 import { useGrooveStore } from '@/stores/groove'
+import { useMidiStore } from '@/stores/midi'
 
 defineEmits<{
   (e: 'share'): void
-  (e: 'exportMidi'): void
-  (e: 'exportPng'): void
 }>()
 
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
+const midi = useMidiStore()
+const { connected: midiConnected } = storeToRefs(midi)
 
 function onClear() {
   const hasAny =
@@ -67,11 +68,19 @@ function onClear() {
       >
         <Trash2 class="h-3.5 w-3.5" /> Clear
       </Button>
-      <Button variant="outline" size="sm" @click="$emit('exportPng')">
-        <ImageIcon class="h-3.5 w-3.5" /> PNG
-      </Button>
-      <Button variant="outline" size="sm" @click="$emit('exportMidi')">
-        <Download class="h-3.5 w-3.5" /> MIDI
+      <Button
+        variant="outline"
+        size="sm"
+        :title="midiConnected ? 'Settings (MIDI connected)' : 'Settings'"
+        class="relative"
+        @click="midi.togglePanel()"
+      >
+        <Settings class="h-3.5 w-3.5" /> Settings
+        <span
+          v-if="midiConnected"
+          class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
+          aria-hidden="true"
+        />
       </Button>
       <Button size="sm" @click="$emit('share')"> <Share2 class="h-3.5 w-3.5" /> Share </Button>
     </div>

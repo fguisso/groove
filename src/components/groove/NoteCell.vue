@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 import { VOICE_BY_ID, type VoiceId } from '@/lib/voices'
+import type { LiveMarkerGrade } from '@/stores/midi'
 
 const props = defineProps<{
   value: number
@@ -12,6 +13,8 @@ const props = defineProps<{
   downbeat?: boolean
   beatStart?: boolean
   label?: string
+  liveHit?: boolean
+  liveMarker?: LiveMarkerGrade
 }>()
 const emit = defineEmits<{ (e: 'click'): void }>()
 
@@ -34,6 +37,19 @@ const accent = computed(() => {
   }
   return (props.kind === 'hat' && props.value === 3) || (props.kind === 'note' && props.value === 2)
 })
+
+const liveMarkerClass = computed(() => {
+  switch (props.liveMarker) {
+    case 'on-time':
+      return 'live-marker live-marker-on-time'
+    case 'wrong-voice':
+      return 'live-marker live-marker-wrong-voice'
+    case 'off-time':
+      return 'live-marker live-marker-off-time'
+    default:
+      return ''
+  }
+})
 </script>
 
 <template>
@@ -49,6 +65,8 @@ const accent = computed(() => {
         filled && 'filled',
         filled && accent && 'accent',
         active && 'active-step',
+        liveHit && 'live-hit',
+        liveMarkerClass,
       )
     "
     @click="emit('click')"
