@@ -100,6 +100,24 @@ Maintenance
 - [ ] More codec test coverage (property-based round-trip fuzz).
 - [ ] Accessibility pass (keyboard nav of the cell grid, ARIA for the transport).
 
+## Privacy and analytics
+
+> **Heads up — there's an analytics tracker in `index.html`.** It is gated by a hostname check and only loads when the page is served from `guisso.dev`. Local dev, forks, and any other self-hosted build skip it entirely.
+
+The tracker is [Tianji](https://github.com/msgbyte/tianji), a privacy-friendly self-hosted analytics tool I run at `tc.guisso.dev`. I use it to know whether the public hosted instance is being used; no personal data is collected.
+
+The relevant block in `index.html`:
+
+```html
+<script>
+  if (location.hostname === 'guisso.dev') {
+    /* injects https://tc.guisso.dev/tracker.js */
+  }
+</script>
+```
+
+If you would rather not have it in your tree at all, delete the block from `index.html` or revert the commit that introduced it (look for `chore: add Tianji analytics` in the log). Either is harmless — nothing else in the app depends on it.
+
 ## About this project
 
 Groove is coming together piece by piece. My main goal is to learn more about music software (how scores render, how audio is scheduled, how state survives in a URL) and to build a tool I can actually use in my own drum practice. I pull features from GrooveScribe where it makes sense and add new ones as I see the need.
