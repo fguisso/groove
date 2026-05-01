@@ -38,6 +38,8 @@ A tolerance slider gives a small grace window so a hit slightly off the grid sti
 
 **Practice review mode.** Optional silent pause between loops (1–30 s, default 10) gives you a moment to study your hits before the next bar comes around. Markers stay on the staff and the grid for the whole review window; they clear at count-in 3 of the next loop. Pressing pause keeps the markers — only the next Play clears them.
 
+**Practice timer.** A toggle next to the Loop switch turns the loop into a bounded practice session: type the duration in minutes, hit play, and a small `MM:SS` clock floats over the bottom of the staff while the groove cycles. When the countdown hits zero the transport stops automatically. The clock is an overlay, not in the document flow, so enabling it never changes the page height — embeds with a fixed iframe height stay exactly the same size. The timer is intentionally available in read-only embeds (`?ro=1`) too, so a shared chart on a lesson page can be used as a self-contained practice loop. It requires loop on; turning loop off auto-disables the timer.
+
 **MIDI and PNG export.** Download the groove as a standard `.mid` file (GM drum mapping) or as a PNG of the rendered score. Both buttons live inside the Settings drawer.
 
 **Light and dark themes.** Tuned to match the aesthetics of modern audio software. The editor defaults to dark; embeds default to following the host's OS theme via CSS, with `?theme=dark` / `?theme=light` as explicit overrides.

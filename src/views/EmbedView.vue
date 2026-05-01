@@ -4,13 +4,16 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ExternalLink } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
+import { usePracticeTimerStore } from '@/stores/practiceTimer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
 import Score from '@/components/groove/Score.vue'
 import Transport from '@/components/groove/Transport.vue'
+import PracticeClock from '@/components/groove/PracticeClock.vue'
 
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
+const practiceTimer = usePracticeTimerStore()
 const route = useRoute()
 
 // Read-only when ?ro=1 appears in the hash's query part
@@ -25,6 +28,15 @@ const editorUrl = computed(() => {
 useUrlSync({ writeBack: false })
 
 const { isPlaying, currentStep, countInBeat, play, stop } = usePlayback()
+
+function onPlay() {
+  play(groove.value)
+  if (practiceTimer.enabled && groove.value.loop) practiceTimer.start()
+}
+function onStop() {
+  practiceTimer.stop()
+  stop()
+}
 
 const host = ref<HTMLDivElement | null>(null)
 let ro: ResizeObserver | null = null
@@ -43,11 +55,14 @@ onMounted(() => {
   ro = new ResizeObserver(() => postHeight())
   if (host.value) ro.observe(host.value)
   postHeight()
+  practiceTimer.setOnExpire(() => onStop())
 })
 onBeforeUnmount(() => {
   ro?.disconnect()
   document.documentElement.classList.remove('is-embed')
   document.body.classList.remove('is-embed')
+  practiceTimer.setOnExpire(null)
+  practiceTimer.stop()
 })
 
 watch(groove, postHeight, { deep: true })
@@ -71,8 +86,11 @@ watch(groove, postHeight, { deep: true })
         <span>Edit</span>
       </a>
     </div>
-    <Score :active-step="currentStep" :is-playing="isPlaying" :selectable="false" />
-    <Transport :is-playing="isPlaying" :read-only="readOnly" @play="play(groove)" @stop="stop()" />
+    <div class="relative">
+      <Score :active-step="currentStep" :is-playing="isPlaying" :selectable="false" />
+      <PracticeClock />
+    </div>
+    <Transport :is-playing="isPlaying" :read-only="readOnly" @play="onPlay" @stop="onStop" />
 
     <Transition name="count-fade">
       <div
