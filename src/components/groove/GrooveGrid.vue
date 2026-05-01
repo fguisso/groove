@@ -38,10 +38,17 @@ function globalIdx(measure: number, localIdx: number) {
 }
 
 const VISIBLE_LANES: VoiceId[] = ['hh', 'ride', 't1', 't2', 't3', 'sn', 'kk']
-const lanes = VISIBLE_LANES.map((id) => {
-  const v = VOICE_BY_ID[id]
-  return { key: id, label: v.label, kind: v.kind }
-})
+const lanes = computed(() =>
+  VISIBLE_LANES.filter((id) => {
+    const v = VOICE_BY_ID[id]
+    if (v.group === 'tom' && !midi.showToms) return false
+    if (v.group === 'cymbal' && !midi.showCymbals) return false
+    return true
+  }).map((id) => {
+    const v = VOICE_BY_ID[id]
+    return { key: id, label: v.label, kind: v.kind }
+  }),
+)
 
 const userWantsSticking = ref<boolean | null>(null)
 const hasAnySticking = computed(() => groove.value.sticking.some((s) => s !== '-'))

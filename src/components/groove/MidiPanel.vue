@@ -17,6 +17,8 @@ const {
   toleranceMs,
   practiceMode,
   practiceTimerSec,
+  showToms,
+  showCymbals,
 } = storeToRefs(midi)
 
 defineEmits<{
@@ -90,6 +92,33 @@ const lastHitVoiceLabel = computed(() =>
             <Download class="h-3.5 w-3.5" /> MIDI
           </button>
         </div>
+      </section>
+
+      <!-- Editor -->
+      <section class="space-y-2">
+        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Editor</h4>
+        <label class="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            :checked="showToms"
+            class="accent-[hsl(var(--primary))]"
+            @change="midi.setShowToms(($event.target as HTMLInputElement).checked)"
+          />
+          <span>Show toms</span>
+        </label>
+        <label class="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            :checked="showCymbals"
+            class="accent-[hsl(var(--primary))]"
+            @change="midi.setShowCymbals(($event.target as HTMLInputElement).checked)"
+          />
+          <span>Show cymbals</span>
+        </label>
+        <p class="text-[11px] leading-snug text-muted-foreground">
+          Hides lanes from the editor grid only — the staff and playback always reflect every note
+          in the groove.
+        </p>
       </section>
 
       <!-- MIDI Device -->

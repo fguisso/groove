@@ -23,6 +23,8 @@ const LATENCY_KEY = 'groove:midiLatency'
 const TOLERANCE_KEY = 'groove:midiTolerance'
 const PRACTICE_MODE_KEY = 'groove:midiPracticeMode'
 const PRACTICE_SEC_KEY = 'groove:midiPracticeSec'
+const SHOW_TOMS_KEY = 'groove:showToms'
+const SHOW_CYMBALS_KEY = 'groove:showCymbals'
 
 function readNumber(key: string, fallback: number): number {
   if (typeof localStorage === 'undefined') return fallback
@@ -65,6 +67,8 @@ export const useMidiStore = defineStore('midi', () => {
   const toleranceMs = ref(readNumber(TOLERANCE_KEY, 40))
   const practiceMode = ref(readBool(PRACTICE_MODE_KEY, false))
   const practiceTimerSec = ref(readNumber(PRACTICE_SEC_KEY, 10))
+  const showToms = ref(readBool(SHOW_TOMS_KEY, true))
+  const showCymbals = ref(readBool(SHOW_CYMBALS_KEY, true))
 
   function setLatency(v: number) {
     latencyMs.value = v
@@ -81,6 +85,14 @@ export const useMidiStore = defineStore('midi', () => {
   function setPracticeTimerSec(v: number) {
     practiceTimerSec.value = Math.max(1, Math.min(60, Math.round(v)))
     writeNumber(PRACTICE_SEC_KEY, practiceTimerSec.value)
+  }
+  function setShowToms(v: boolean) {
+    showToms.value = v
+    writeBool(SHOW_TOMS_KEY, v)
+  }
+  function setShowCymbals(v: boolean) {
+    showCymbals.value = v
+    writeBool(SHOW_CYMBALS_KEY, v)
   }
 
   // Live markers — feedback dots dropped onto the grid and tablature for each
@@ -168,11 +180,15 @@ export const useMidiStore = defineStore('midi', () => {
     toleranceMs,
     practiceMode,
     practiceTimerSec,
+    showToms,
+    showCymbals,
     markers,
     setLatency,
     setTolerance,
     setPracticeMode,
     setPracticeTimerSec,
+    setShowToms,
+    setShowCymbals,
     openPanel,
     closePanel,
     togglePanel,
