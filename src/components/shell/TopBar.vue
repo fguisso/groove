@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { Share2, Trash2, Settings } from 'lucide-vue-next'
+import { Github, Share2, Trash2, Settings } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import GrooveLogo from '@/components/shell/GrooveLogo.vue'
@@ -60,6 +60,16 @@ function onClear() {
     </div>
 
     <div class="flex items-center gap-1.5">
+      <a
+        href="https://github.com/fguisso/groove"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        title="View source on GitHub"
+        aria-label="View source on GitHub"
+      >
+        <Github class="h-3.5 w-3.5" />
+      </a>
       <Button
         variant="ghost"
         size="sm"
