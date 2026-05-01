@@ -4,6 +4,43 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-05-01 — Practice timer (bounded loop session with on-screen clock)
+
+**Status:** New control next to the Loop toggle lets the user pick a duration in minutes; an mm:ss clock sits between the staff and the transport. Hitting play with the timer enabled starts the countdown; at zero, playback auto-stops. Works in editor and embed (including `?ro=1`).
+
+**Done:**
+
+- `src/stores/practiceTimer.ts` (new) — Pinia store. Persists `minutes` (1–60, default 4) under `groove:practiceTimerMinutes`, mirroring the `readNumber`/`writeNumber` pattern used in `midi.ts`. Ephemeral `enabled` and `remainingMs` refs. `start()` / `stop()` manage a `setInterval(250ms)` against a wall-clock `expiresAt`. `setOnExpire(fn)` lets views register a callback that fires once when the countdown hits zero.
+- `src/components/groove/PracticeClock.vue` (new) — small mm:ss readout with a `lucide` Timer glyph. Only renders when `enabled` is true. Shows the configured duration when idle and the live remaining time while running; running state gets a primary-color glow. **Positioned as an `absolute inset-x-0 bottom-2` overlay**, not in flow — so enabling the timer never adds vertical height. This matters in iframes with a fixed `height` attribute: an inline clock would have pushed the Transport row past the iframe edge. The clock is anchored to a small `relative` wrap that surrounds **only** the `<Score />` in each view, so the badge sits inside-and-on-top of the staff panel near its bottom edge (not floating at the very bottom of the page next to GrooveGrid). The badge uses `bg-background/90 backdrop-blur-sm` so it reads cleanly against the staff gradient.
+- `src/components/groove/Transport.vue` — added a timer label group: Switch + `<input type="number">` (1–60) + "min". Lives in the same right-side row as Loop / Metronome / Count-in. Loop / Metronome / Count-in keep their `v-if="!props.readOnly"` gating; the timer label deliberately drops it. When `groove.loop === false`, the timer label is rendered with `opacity-40 cursor-not-allowed` and a tooltip that explains it requires loop. A watcher auto-disables the timer when the user toggles loop off, so the UI never shows "timer on" while loop is off.
+- `src/views/EditorView.vue` — wraps `<Score />` in a `<div class="relative">` and mounts `<PracticeClock />` as the wrap's second child, so the absolute clock anchors to the score panel rather than to `<main>`. `onPlay` calls `practiceTimer.start()` if `enabled && groove.loop`; `onStop` calls `practiceTimer.stop()`. Registers `setOnExpire(() => onStop())` in `onMounted` so an expiring timer follows the same teardown path as a manual stop (preserves the existing measure-snapshot behavior).
+- `src/views/EmbedView.vue` — same wiring. Score gets the same `relative` wrap with PracticeClock alongside it. Wraps `play(groove)` / `stop()` via local `onPlay` / `onStop` so the timer can hook into both.
+
+**Decisions:**
+
+- **Wall-clock, not Tone.Part.** A 4-minute practice session does not need sub-second accuracy, and embedding the timer in `Tone.Part` would force a re-anchor on every tempo / measure / metronome / count-in toggle. A `Date.now()`-anchored interval is decoupled from the audio scheduler and can't drift relative to "what the user expected when they pressed play."
+- **Restart-on-play, no pause/resume.** Each press of Play resets `remainingMs` to the full configured duration. Pause/resume is more state to manage and the user did not ask for it.
+- **Timer requires loop, but is its own toggle.** Forcing loop on automatically (the alternative we considered) would override a deliberate user choice. Disabled state with a tooltip is more honest. The `loop → false` watcher makes the disabled state self-healing rather than a click-to-clear footgun.
+- **Always visible in `?ro=1` embeds.** This was the user's explicit ask: a shared chart should be usable as a practice loop without the embed owner having to drop the read-only flag. Loop / Metronome / Count-in still stay gated by `readOnly` — read-only means "you can't change the chart," not "you can't bound your practice session."
+- **Per-origin localStorage for the minutes value.** Same key (`groove:practiceTimerMinutes`) for editor and embed since they share an origin. If embed and editor ever diverge by host, the embed will fall back to the default 4 — acceptable.
+- **Inline minutes input, no presets popover.** User chose the inline form.
+- **Clock as overlay, not in flow.** Initial pass placed it as a regular block between Score and Transport. The user flagged this would break iframes with a fixed `height` attribute (the embed becomes taller than its host frame, content gets clipped). Switching to absolute positioning at `bottom-2` of the relative-positioned container keeps the layout height identical with or without the timer enabled. The trade-off is the badge can overlap the bottom of the grid / score, but it's small (~28 px tall) and translucent enough to coexist.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), vite build all pass.
+
+**Caveats:**
+
+- End-to-end was not exercised in a browser this session — only build sanity. The user should verify:
+  1. Editor: 1-minute timer + loop on, hit play, confirm clock counts down and playback stops at 00:00.
+  2. Loop interlock: turn loop off — timer label should gray out and the clock should disappear (the watcher disables the timer).
+  3. Embed: open an embed URL, confirm the clock + toggle render. Verify with `?ro=1` that the timer toggle is still visible while Loop / Metronome / Count-in stay hidden.
+  4. Persistence: change minutes, reload, value sticks.
+- A separate `PracticeClock` chunk shows up in the build output (~54 kB raw, ~18 kB gzipped). That's the cost of being a shared component between two views; it's not a regression in the page-load critical path because the chunk is shared.
+
+**Next:** If practicing against the click for a fixed duration becomes a routine, consider a "session complete" sound at expiry. Out of scope today.
+
+---
+
 ## 2026-05-01 — GitHub link in the top bar
 
 **Status:** Small navigation affordance. Icon-only anchor next to Clear in `TopBar.vue` opens `https://github.com/fguisso/groove` in a new tab. Uses lucide's `Github` glyph and the same muted-foreground hover treatment as the other toolbar chrome.

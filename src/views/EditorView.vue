@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore, type LiveMarkerGrade } from '@/stores/midi'
+import { usePracticeTimerStore } from '@/stores/practiceTimer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
 import { DIVISIONS } from '@/lib/model'
@@ -12,6 +13,7 @@ import ShareDialog from '@/components/shell/ShareDialog.vue'
 import GrooveGrid from '@/components/groove/GrooveGrid.vue'
 import Score from '@/components/groove/Score.vue'
 import Transport from '@/components/groove/Transport.vue'
+import PracticeClock from '@/components/groove/PracticeClock.vue'
 import MidiPanel from '@/components/groove/MidiPanel.vue'
 import Select from '@/components/ui/Select.vue'
 import { exportMidi } from '@/lib/export-midi'
@@ -20,6 +22,7 @@ import { exportPng } from '@/lib/export-png'
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 const midi = useMidiStore()
+const practiceTimer = usePracticeTimerStore()
 useUrlSync()
 
 const { isPlaying, currentStep, countInBeat, practiceTimerVal, play, stop, updateRuntime } =
@@ -69,6 +72,7 @@ function onPlay() {
   play(groove.value, {
     practicePauseSec: midi.practiceMode ? midi.practiceTimerSec : 0,
   })
+  if (practiceTimer.enabled && groove.value.loop) practiceTimer.start()
 }
 function onStop() {
   // Snapshot the playing measure before stop() resets currentStep, so the
@@ -81,6 +85,7 @@ function onStop() {
   // In practice mode the user explicitly wants to keep markers visible after
   // pausing — only the next Play press clears them.
   if (!midi.practiceMode) midi.clearMarkers()
+  practiceTimer.stop()
   stop()
 }
 
@@ -93,8 +98,15 @@ function onKeydown(e: KeyboardEvent) {
   if (isPlaying.value) onStop()
   else onPlay()
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  practiceTimer.setOnExpire(() => onStop())
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  practiceTimer.setOnExpire(null)
+  practiceTimer.stop()
+})
 
 const shareOpen = ref(false)
 const scoreRef = ref<InstanceType<typeof Score> | null>(null)
@@ -134,7 +146,10 @@ async function onExportPng() {
         </div>
       </div>
 
-      <Score ref="scoreRef" :active-step="currentStep" :is-playing="isPlaying" />
+      <div class="relative">
+        <Score ref="scoreRef" :active-step="currentStep" :is-playing="isPlaying" />
+        <PracticeClock />
+      </div>
       <Transport :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
       <GrooveGrid :active-step="currentStep" :is-playing="isPlaying" />
     </main>
