@@ -6,7 +6,7 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 ### `src/lib/` — pure logic, no Vue or Tone
 
-- `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, and synth dispatch keys. Includes `voiceForMidiNote()` for MIDI input mapping (registry states + `INPUT_ONLY_MIDI` for kit-side notes like snare rim).
+- `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, synth dispatch keys, and an optional `group: 'tom' | 'cymbal'` for the editor's bulk-collapse toggles. Includes `voiceForMidiNote()` for MIDI input mapping (registry states + `INPUT_ONLY_MIDI` for kit-side notes like snare rim).
 - `model.ts` — `Groove` shape; `Voices` type guarantees `hh`/`sn`/`kk` are present; toms and ride are optional. Uses `voices.ts` for cycle helpers.
 - `codec.ts` — bit-packed binary, base64url-encoded for the URL fragment. v4 is registry-driven (presence bitmap over `VOICES` order, then cells in order). v3 stays read-only for legacy URLs (maps `t4`→`t3`, `cy`→`ride`).
 - `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths.
@@ -21,8 +21,8 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 ### `src/stores/`
 
-- `groove.ts` — Pinia store wrapping the current `Groove` plus a few editor-only flags.
-- `midi.ts` — Pinia store wrapping Web MIDI access, last-hit, latency/tolerance settings (persisted to `localStorage`), the live-marker list, the practice-mode toggle + review timer, and the Settings drawer open flag. Shared by `MidiPanel`, `GrooveGrid`, `Score`, `TopBar`, and `EditorView`.
+- `groove.ts` — Pinia store wrapping the current `Groove` plus a few editor-only flags. `selectedMeasure` (UI-only, not encoded in URL) drives the GrooveGrid single-measure mode and the Score click-to-select overlay.
+- `midi.ts` — Pinia store wrapping Web MIDI access, last-hit, latency/tolerance settings (persisted to `localStorage`), the live-marker list, the practice-mode toggle + review timer, the editor lane-visibility toggles (`showToms` / `showCymbals`, persisted), and the Settings drawer open flag. Shared by `MidiPanel`, `GrooveGrid`, `Score`, `TopBar`, and `EditorView`.
 
 ### `src/views/`
 
@@ -31,7 +31,7 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 ### `src/components/`
 
-- `groove/` — domain components: `Score.vue`, `Transport.vue`, the cell grid, etc.
+- `groove/` — domain components: `Score.vue`, `Transport.vue`, `GrooveGrid.vue` (single + stack modes via `isPlaying`), `MeasureTabs.vue` (measure switcher with `+` button), the cell grid, etc.
 - `shell/`, `ui/`, `icons/` — chrome and primitives.
 
 ### `src/styles/`

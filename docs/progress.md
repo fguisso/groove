@@ -4,6 +4,118 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-05-01 — GitHub link in the top bar
+
+**Status:** Small navigation affordance. Icon-only anchor next to Clear in `TopBar.vue` opens `https://github.com/fguisso/groove` in a new tab. Uses lucide's `Github` glyph and the same muted-foreground hover treatment as the other toolbar chrome.
+
+**Decision:** Anchor over button + `window.open` so middle-click and cmd-click work for opening the repo in a background tab without code.
+
+---
+
+## 2026-05-01 — Show/hide tom and cymbal lanes (Settings → Editor)
+
+**Status:** Two new toggles in the Settings drawer collapse tom rows and cymbal rows from the grid. Purely visual — staff and audio still play every note.
+
+**Done:**
+
+- `src/lib/voices.ts` — `Voice.group?: 'tom' | 'cymbal'` field (optional). `t1`, `t2`, `t3` tagged `'tom'`; `ride` tagged `'cymbal'`. Future cymbal voices (crash, etc.) inherit the toggle by tagging themselves at registry time — no UI plumbing needed.
+- `src/stores/midi.ts` — two new persisted booleans `showToms`, `showCymbals` (default `true`), keys `groove:showToms` / `groove:showCymbals`. Setters via the existing `writeBool` helper.
+- `src/components/groove/GrooveGrid.vue` — `lanes` is now a `computed` filtering `VISIBLE_LANES` by `voice.group` against the store flags. Both single and stack render modes already iterated `lanes`, so no template changes — fewer rows just appear.
+- `src/components/groove/MidiPanel.vue` — new "Editor" section between Export and MIDI device with two checkboxes plus a one-liner explaining the toggle is editor-only.
+
+**Decisions:**
+
+- **Visual only.** The codec, the `Groove` type, the store, and the URL hash were not touched. Two users opening the same share link must always see the same notes regardless of each one's local toggle state. Hidden lanes still play through the synth and still render on the staff.
+- **Cymbal toggle is plural and forward-looking.** The user explicitly mentioned that `attacks` (crashes etc.) will land in their own lane later. Naming the toggle "Show cymbals" today avoids a rename when those land — they'll just tag `group: 'cymbal'` in the registry.
+- **`group` on the voice registry, not a hardcoded list in `GrooveGrid`.** Putting the metadata next to the voice itself means any voice author handles their own grouping. The grid's filter stays oblivious to which voices are toms.
+- **Persisted in `localStorage` like the other Settings flags** (`practiceMode`, `latencyMs`, `toleranceMs`). Personal editor preference, never per-groove.
+
+**Next:** Watch for the user adding more cymbals (crash etc.) — should slot in cleanly. Tom soloing during playback is a tangential request that would need a different mechanism; not on the list yet.
+
+---
+
+## 2026-05-01 — Embed: follow OS theme via CSS, Edit-in-editor link
+
+**Status:** Embed iframes now inherit the host's OS theme automatically (no JS listener, no postMessage protocol) and expose a small "Edit" link that opens the same groove in the full editor.
+
+**Done:**
+
+- `src/main.ts` — split the theme bootstrap into editor vs embed branches. Editor keeps the existing default `dark`. Embed default is `auto`: when the URL has no `?theme=`, no class is added at all and CSS handles the rest. `?theme=dark` adds `.dark`; `?theme=light` adds a marker `.theme-light` so the media query is bypassed.
+- `src/styles/tailwind.css` — added a `@media (prefers-color-scheme: dark)` block scoped to `html.is-embed:not(.theme-light):not(.dark)` that mirrors the dark CSS-var palette. The dark `.panel` shadow override gets the same media-wrapped duplicate. Both palette and shadow are now duplicated — kept in sync via a comment at the top of the dark block.
+- `src/views/EmbedView.vue` — `editorUrl` computed maps the current `route.params.payload` back into a `#/g/:payload` URL on the same `${origin}${pathname}`. New header row holds the title (truncated) plus an `<a target="_blank" rel="noopener">` styled with the lucide `ExternalLink` icon. Falls back to `#/` when no payload.
+
+**Decisions:**
+
+- **Pure CSS over `matchMedia('change')` listener.** A listener works, but the user explicitly asked for the no-events route. CSS recalculates on `prefers-color-scheme` change for free, and Safari's first-paint quirk doesn't apply here because the dark-vars rule only matters on a re-cascade triggered by the OS toggle, which Safari handles correctly.
+- **Editor stays on `dark` default.** The user only flagged the embed as needing OS-following behavior. The editor is a focused workspace and the dark default is intentional.
+- **`.theme-light` marker, not `.light`.** Two reasons: it's only used to break out of the media query (semantic = "explicit light override"), and using a name distinct from any Tailwind utility avoids collision risk if Tailwind ever adds a `.light` class strategy.
+- **Edit link, not a button.** Native anchor with `target="_blank"` cooperates with browser middle-click / cmd-click to open background tabs. A button + `window.open` would lose that ergonomics.
+
+**Caveat:** Light/dark dark-vars are duplicated in two CSS blocks. If a future palette tweak forgets one, hot-reloaded embed previews will silently disagree with the editor. A PostCSS step that emits both from a single source would be the proper DRY fix; left as-is for now since the palette is stable.
+
+**Next:** Consider adding a "Copy link" button in the embed footer too, since "Edit" implies the user already wants to share / save the groove they're looking at.
+
+---
+
+## 2026-05-01 — Score uses full container width (cap removed)
+
+**Status:** Bug fix on top of the multi-measure editor work. The staff was rendering at 720 px (the fallback) inside a much wider card, leaving the right portion of multi-measure grooves visually clipped at the staff's right edge.
+
+**Root cause:** `Score.vue` was reading `container.clientWidth` from the inner host `<div ref="host">`, which sits inside an `inline-block` wrap. Inline-block elements without an explicit width are shrink-to-fit on their content; before the SVG is drawn, the inner div has `clientWidth === 0` and the renderer fell back to 720 px.
+
+**Done:**
+
+- `src/components/groove/Score.vue` — added a separate `hostRoot` ref on the outer `.score-host` (block-level, fills the panel). `availableWidth()` reads `hostRoot.clientWidth` and subtracts horizontal padding via `getComputedStyle`, then passes the result to `renderScore({ width })`. Also added a `ResizeObserver` on the outer host so the staff redraws on container resize, not only on `window.resize`.
+- `src/lib/vex-builder.ts` — removed the `Math.min(1100, ...)` cap on width. The `max-w-[1200px]` constraint already lives on the page main, and the per-measure formatter can use the extra pixels for breathing room.
+- `src/components/groove/Score.vue` — `text-center` on the host so when the SVG is narrower than its container (e.g. via an explicit `opts.width` in `export-png`), the staff centers instead of pinning left.
+
+**Decisions:**
+
+- **Read the outer host, not the inner.** The inner div is wrapped by `inline-block`; clientWidth there is content-derived and unreliable until after the first SVG paint. Outer host is `display: block` (the `.score-host` class) and reflects actual layout from first paint.
+- **`ResizeObserver` over `window.resize` only.** Sidebars opening/closing, drawer overlays, and parent layout changes don't always fire `window.resize`. Observing the host catches everything.
+
+**Caveat:** `availableWidth` calls `getComputedStyle` on each redraw. Cheap enough but worth noting if redraws ever land in a hot loop.
+
+---
+
+## 2026-05-01 — Multi-measure editor: GrooveGrid one-at-a-time, Score-driven nav
+
+**Status:** Editor switches between a single-measure grid (paused) and a vertical stack of every measure (playing). Score becomes the navigator: clicking a measure on the staff selects it. Measures dropdown replaced by `[ 1 ] [ 2 ] ... [ N ] [ + ]` tabs.
+
+**Done:**
+
+- `src/stores/groove.ts` — `selectedMeasure: number` UI flag in state. `setSelectedMeasure(m)` clamps to `[0, measures-1]`; `setMeasures` and `replace` re-clamp; `reset` zeroes it. Lives in the store (not the URL hash) so it stays out of share links.
+- `src/lib/vex-builder.ts` — `RenderResult` now exposes `measureBounds: { x, width }[]`, captured per stave inside the existing measure loop. Lets the Score component overlay click targets without reimplementing stave geometry.
+- `src/components/groove/Score.vue` — transparent `<button class="score-measure-hit">` overlays per measure. Selected measure gets a faint primary tint + bottom border. Disabled while `isPlaying`. New `selectable` prop (default true) lets `EmbedView` opt out via `v-show`.
+- `src/components/groove/MeasureTabs.vue` (new) — small tab strip reading `selectedMeasure` and `groove.measures` from the store. `+` button calls `setMeasures(measures + 1)` then jumps `selectedMeasure` to the new tail; disabled at 8.
+- `src/components/groove/GrooveGrid.vue` (refactor) — two render modes driven by `props.isPlaying`:
+  - **Single (paused):** renders only `selectedMeasure`. `globalIdx(measure, localIdx)` translates back into the underlying voice arrays so cycle/click handlers are unchanged.
+  - **Stack (playing):** v-fors over every measure, each block self-contained (label header + sticking row + lanes). Wrapper has `max-height: min(70vh, 720px); overflow-y: auto`. `activeMeasure` watcher (recomputes from `currentStep`) calls `host.scrollTo({ top, behavior: 'smooth' })` only when the measure index changes — scrolling per step would fight the smooth animation.
+- `src/views/EditorView.vue` — Measures `<Select>` removed (replaced by MeasureTabs inside the grid). `<Score>` gets `:is-playing`. `onStop` now snapshots the playing measure via `Math.floor(currentStep.value / division) % measures` _before_ calling `stop()`, so the single-mode grid resumes on the bar the user paused on.
+- `src/views/EmbedView.vue` — Score gets `:is-playing` and `:selectable="false"` so the embed doesn't show clickable measure overlays.
+
+**Decisions:**
+
+- **`selectedMeasure` is store state, not local to EditorView.** Three components (Score, MeasureTabs, GrooveGrid) read it; the store's existing pattern of "Groove + a few editor-only flags" already accommodates UI-only state, and using a store ref means clamping logic lives next to `setMeasures`.
+- **Stack-mode auto-scroll fires on measure change, not step change.** A per-step `scrollTo` either no-ops (when destination doesn't change) or restarts the smooth animation, both wasteful. Watching the derived `activeMeasure` keeps the scroll calls coarse and the animation continuous.
+- **Pause = jump to currently-playing measure.** User chose this over "preserve pre-play selection" — matches the "pause to fix what just played" use case better than "pause as preview".
+- **Score click is no-op while playing.** Scrubbing during play would mean re-anchoring the Tone transport mid-loop; not worth the regression risk for a feature whose primary need is editing-time navigation.
+- **Max measures stays at 8 (current store cap).** Codec already supports far more (`measures` is a u8 with `n ≤ 2048` total steps), but 8 covers practice grooves and avoids stress-testing the vertical stack height.
+- **Single-mode `+ Sticking` toggle stays on the first visible block only.** Toggle is global UI state; rendering it on every measure block during play would clutter and serves no purpose since toggling is disabled mid-play anyway.
+- **Embed gets `selectable=false` rather than reusing `isPlaying=true`.** Different semantics — playing means "active runtime," not selectable means "no editor". Conflating them broke when an embed is paused.
+
+**Sensors:** typecheck, eslint, vitest (9 tests), prettier check, vite build all pass.
+
+**Caveats:** End-to-end browser exercise (clicking through tabs, watching the stack scroll mid-play, MIDI live markers in stack mode) was not possible from this session — only build sanity. The user should:
+
+1. Verify scroll-to-center in stack mode visually with `measures=4..8`. If the host height calculation feels off, the math is `el.offsetTop - host.clientHeight/2 + el.clientHeight/2`.
+2. Verify on `division=32 × measures=8` the perf is acceptable (each block has ~256 cells × 7 lanes; rendering all eight is the worst-case path that didn't exist before).
+3. Verify MIDI live markers fire on the right cells in stack mode (the `globalIdx` math is shared between modes, so it should, but practice mode markers were specced against the single-row layout).
+
+**Next:** Consider a "remove this measure" affordance per tab once the basic flow gets used. The store already supports lower `measures` via `setMeasures(n - 1)`, but there's no UI handle yet (out of scope for this pass).
+
+---
+
 ## 2026-04-26 — Score markers aligned to actual notes
 
 **Status:** Live MIDI markers on the staff now sit on top of the real noteheads (per voice), are bigger, borderless, and semi-transparent so the underlying note glyph reads through.
