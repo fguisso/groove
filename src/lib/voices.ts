@@ -8,6 +8,7 @@
 
 export type VoiceId = 'hh' | 'sn' | 'kk' | 't1' | 't2' | 't3' | 'ride'
 export type VoiceKind = 'hat' | 'note'
+export type VoiceGroup = 'tom' | 'cymbal'
 
 export interface VoiceState {
   // index 0 in `Voice.states` is "off" — empty object.
@@ -29,6 +30,7 @@ export interface Voice {
   vexKey: string // default VexFlow key when state has no override
   defaultSynthKey: string // default synth key in usePlayback's synth bank
   states: readonly VoiceState[]
+  group?: VoiceGroup // editor-only: lets the Settings drawer collapse lane families
 }
 
 export const VOICES: readonly Voice[] = [
@@ -82,6 +84,7 @@ export const VOICES: readonly Voice[] = [
     bitsPerCell: 2,
     vexKey: 'e/5',
     defaultSynthKey: 't1',
+    group: 'tom',
     states: [
       {},
       { midi: 50, velocity: 0.85, symbol: '●' },
@@ -96,6 +99,7 @@ export const VOICES: readonly Voice[] = [
     bitsPerCell: 2,
     vexKey: 'd/5',
     defaultSynthKey: 't2',
+    group: 'tom',
     states: [
       {},
       { midi: 47, velocity: 0.85, symbol: '●' },
@@ -110,6 +114,7 @@ export const VOICES: readonly Voice[] = [
     bitsPerCell: 2,
     vexKey: 'a/4',
     defaultSynthKey: 't3',
+    group: 'tom',
     states: [
       {},
       { midi: 41, velocity: 0.85, symbol: '●' },
@@ -124,6 +129,7 @@ export const VOICES: readonly Voice[] = [
     bitsPerCell: 2,
     vexKey: 'f/5/x2',
     defaultSynthKey: 'ride',
+    group: 'cymbal',
     states: [
       {},
       { midi: 51, velocity: 0.8, symbol: 'x' },
