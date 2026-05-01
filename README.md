@@ -12,13 +12,15 @@ It also sparked my curiosity about the stack behind music software on the web: h
 
 ## Features
 
-**Embed via iframe.** This is the feature I care about most. I use it on my personal wiki to document drum lessons and practice goals, and this app exists in large part so that workflow keeps working. Live example: [In the End (lesson notes)](https://wiki.guisso.dev/music/aulas-de-bateria-com-grillo/in-the-end/). The embed view has no editor chrome, can be locked read-only via `?ro=1`, and posts a `groove:resize` message to the parent so the host page can auto-fit the iframe height.
+**Embed via iframe.** This is the feature I care about most. I use it on my personal wiki to document drum lessons and practice goals, and this app exists in large part so that workflow keeps working. Live example: [In the End (lesson notes)](https://wiki.guisso.dev/music/aulas-de-bateria-com-grillo/in-the-end/). The embed view has no editor chrome, can be locked read-only via `?ro=1`, and posts a `groove:resize` message to the parent so the host page can auto-fit the iframe height. The embed follows the host's OS theme automatically — no flicker, no JS listener, no postMessage protocol; it's a CSS `@media (prefers-color-scheme: dark)` rule. To force a specific look, pass `?theme=dark` or `?theme=light` in the URL. A small "Edit" link in the corner of the embed opens the same groove in the full editor in a new tab, so a reader who finds an interesting bar on a lesson page can jump straight into editing it.
 
 > Heads up if you are embedding against a hosted instance on my domain (`guisso.dev` or subdomains): the URL payload format and route shape are not a stable API contract yet. I may change the codec or the routes as the project evolves, which will break embeds pinned to the old format. If you rely on embeds long term, fork this repo and host your own build instead.
 
 **Notation that reads like a drum chart.** Beams group per beat, stems go up, notes at the same tick share a single stem, and empty space inside a beat is absorbed into the preceding note duration (a 16th followed by an empty slot becomes an 8th, and so on). A translucent marker follows playback through the score, sitting on the note currently ringing.
 
-**Cell-based input grid.** Click to cycle note states: normal, accent, ghost, open hat, pedal. Lanes for hi-hat, ride, three toms (high, mid, floor), snare, and kick, with an optional sticking row for R, L, B. Visual gaps delimit beats inside each measure so the grid reads at a glance.
+**Cell-based input grid.** Click to cycle note states: normal, accent, ghost, open hat, pedal. Lanes for hi-hat, ride, three toms (high, mid, floor), snare, and kick, with an optional sticking row for R, L, B. Visual gaps delimit beats inside each measure so the grid reads at a glance. The grid shows **one measure at a time** so 32nds × 8 bars stays readable instead of becoming a 256-column wall — the staff above is the full overview, the grid below is the focused editor.
+
+**Multi-measure grooves.** A row of tabs `[ 1 ] [ 2 ] [ + ]` above the grid lets you add measures (up to 8) and switch which one you're editing. The staff is also clickable: tap any measure on the score and the grid jumps to it. When you press play, the grid switches to a vertical stack of every measure and auto-scrolls to keep the playing bar centered on screen — when you pause, it collapses back to single-measure view, parked on whichever bar was last playing so you can fix what you just heard.
 
 **Synthesized audio via Tone.js.** No samples to download. Kick is a tight membrane synth, snare mixes filtered noise with a tonal body, hi-hats are shaped from white noise through carefully tuned filters, toms are pitched membranes, ride is filtered noise plus a tonal partial. Swing, loop, metronome, and count-in are all supported. When count-in is on it plays before every loop iteration, not just the first, so practicing against the chart feels like a real warm-up. A large on-screen counter shows the count-in beats.
 
@@ -32,13 +34,13 @@ It also sparked my curiosity about the stack behind music software on the web: h
 
 A tolerance slider gives a small grace window so a hit slightly off the grid still counts. While playback is stopped, hitting a pad lights up its first grid cell so you can verify the device-to-voice mapping before practicing.
 
-**Settings drawer.** A side panel (open via the Settings button or the Settings shortcut) holds the MIDI gear: device connect/disconnect, latency offset and tolerance sliders, last-pad readout, the practice-mode toggle, and the MIDI/PNG export buttons.
+**Settings drawer.** A side panel (open via the Settings button) holds the gear: MIDI device connect/disconnect, latency offset and tolerance sliders, last-pad readout, the practice-mode toggle, and the MIDI/PNG export buttons. An **Editor** section there also lets you collapse the tom rows or the cymbal rows (today just ride, more cymbals coming) when you're working on a hat-snare-kick groove and the extra lanes are noise. The toggles are purely visual — the staff and audio always reflect every note in the groove, and the choice is per-browser, never part of the shareable URL.
 
 **Practice review mode.** Optional silent pause between loops (1–30 s, default 10) gives you a moment to study your hits before the next bar comes around. Markers stay on the staff and the grid for the whole review window; they clear at count-in 3 of the next loop. Pressing pause keeps the markers — only the next Play clears them.
 
 **MIDI and PNG export.** Download the groove as a standard `.mid` file (GM drum mapping) or as a PNG of the rendered score. Both buttons live inside the Settings drawer.
 
-**Light and dark themes.** Tuned to match the aesthetics of modern audio software.
+**Light and dark themes.** Tuned to match the aesthetics of modern audio software. The editor defaults to dark; embeds default to following the host's OS theme via CSS, with `?theme=dark` / `?theme=light` as explicit overrides.
 
 **Keyboard shortcut.** Press <kbd>Space</kbd> to play/pause. (The grid and inputs swallow the key when focused, so typing in a title field stays normal.)
 
