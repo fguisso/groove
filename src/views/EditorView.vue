@@ -71,6 +71,13 @@ function onPlay() {
   })
 }
 function onStop() {
+  // Snapshot the playing measure before stop() resets currentStep, so the
+  // single-mode grid resumes on whatever bar the user paused on.
+  const s = currentStep.value
+  if (s >= 0) {
+    const m = Math.floor(s / groove.value.division) % groove.value.measures
+    store.setSelectedMeasure(m)
+  }
   // In practice mode the user explicitly wants to keep markers visible after
   // pausing — only the next Play press clears them.
   if (!midi.practiceMode) midi.clearMarkers()
@@ -117,16 +124,6 @@ async function onExportPng() {
             @update:model-value="store.setDivision($event as typeof groove.division)"
           />
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
-            >Measures</label
-          >
-          <Select
-            :model-value="groove.measures"
-            :options="[1, 2, 3, 4].map((m) => ({ label: String(m), value: m }))"
-            @update:model-value="store.setMeasures(Number($event))"
-          />
-        </div>
         <div
           class="ml-auto flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
         >
@@ -137,7 +134,7 @@ async function onExportPng() {
         </div>
       </div>
 
-      <Score ref="scoreRef" :active-step="currentStep" />
+      <Score ref="scoreRef" :active-step="currentStep" :is-playing="isPlaying" />
       <Transport :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
       <GrooveGrid :active-step="currentStep" :is-playing="isPlaying" />
     </main>

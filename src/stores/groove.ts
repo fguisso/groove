@@ -11,13 +11,22 @@ import {
 import { VOICES, type VoiceId } from '@/lib/voices'
 
 export const useGrooveStore = defineStore('groove', {
-  state: (): { groove: Groove } => ({ groove: emptyGroove() }),
+  state: (): { groove: Groove; selectedMeasure: number } => ({
+    groove: emptyGroove(),
+    selectedMeasure: 0,
+  }),
   actions: {
     replace(g: Groove) {
       this.groove = resizeArrays(g)
+      this.selectedMeasure = Math.max(0, Math.min(this.selectedMeasure, this.groove.measures - 1))
     },
     reset() {
       this.groove = emptyGroove()
+      this.selectedMeasure = 0
+    },
+    setSelectedMeasure(m: number) {
+      const max = this.groove.measures - 1
+      this.selectedMeasure = Math.max(0, Math.min(max, Math.round(m)))
     },
     setTitle(t: string) {
       this.groove.title = t
@@ -38,6 +47,9 @@ export const useGrooveStore = defineStore('groove', {
     setMeasures(m: number) {
       this.groove.measures = Math.max(1, Math.min(8, Math.round(m)))
       this.groove = resizeArrays(this.groove)
+      if (this.selectedMeasure > this.groove.measures - 1) {
+        this.selectedMeasure = this.groove.measures - 1
+      }
     },
     toggleMetronome() {
       this.groove.metronome = !this.groove.metronome
