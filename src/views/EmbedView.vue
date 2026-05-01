@@ -52,7 +52,7 @@ watch(groove, postHeight, { deep: true })
       <span class="font-semibold">{{ groove.title }}</span>
       <span v-if="groove.author" class="text-muted-foreground"> — {{ groove.author }}</span>
     </div>
-    <Score :active-step="currentStep" />
+    <Score :active-step="currentStep" :is-playing="isPlaying" :selectable="false" />
     <Transport :is-playing="isPlaying" :read-only="readOnly" @play="play(groove)" @stop="stop()" />
 
     <Transition name="count-fade">

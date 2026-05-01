@@ -3,37 +3,64 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore } from '@/stores/midi'
-import { renderScore, type StepMarker } from '@/lib/vex-builder'
+import { renderScore, type MeasureBounds, type StepMarker } from '@/lib/vex-builder'
 import type { VoiceId } from '@/lib/voices'
 
-const props = defineProps<{ activeStep?: number }>()
+const props = withDefaults(
+  defineProps<{ activeStep?: number; isPlaying?: boolean; selectable?: boolean }>(),
+  { selectable: true },
+)
 
 const store = useGrooveStore()
-const { groove } = storeToRefs(store)
+const { groove, selectedMeasure } = storeToRefs(store)
 const midi = useMidiStore()
 const { markers } = storeToRefs(midi)
+const hostRoot = ref<HTMLDivElement | null>(null)
 const host = ref<HTMLDivElement | null>(null)
 const stepMarkers = ref<StepMarker[]>([])
 const scoreHeight = ref(200)
 const voiceY = ref<Record<VoiceId, number>>({} as Record<VoiceId, number>)
+const measureBounds = ref<MeasureBounds[]>([])
+
+function availableWidth(): number {
+  // The inner host div is inside an `inline-block` wrap, so its clientWidth is
+  // 0 before the SVG is drawn. Read from the outer score-host (block-level)
+  // and subtract its horizontal padding so the SVG fits exactly.
+  const root = hostRoot.value
+  if (!root) return 720
+  const cs = getComputedStyle(root)
+  const padL = parseFloat(cs.paddingLeft) || 0
+  const padR = parseFloat(cs.paddingRight) || 0
+  return Math.max(0, root.clientWidth - padL - padR)
+}
 
 function redraw() {
   if (!host.value) return
   try {
-    const res = renderScore(host.value, groove.value)
+    const res = renderScore(host.value, groove.value, { width: availableWidth() })
     stepMarkers.value = res.stepMarkers
     scoreHeight.value = res.height
     voiceY.value = res.voiceY
+    measureBounds.value = res.measureBounds
   } catch (e) {
     console.warn('[score] render failed', e)
   }
 }
 
+let ro: ResizeObserver | null = null
+
 onMounted(() => {
   redraw()
   window.addEventListener('resize', redraw)
+  if (hostRoot.value && typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(() => redraw())
+    ro.observe(hostRoot.value)
+  }
 })
-onBeforeUnmount(() => window.removeEventListener('resize', redraw))
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', redraw)
+  ro?.disconnect()
+})
 watch(groove, redraw, { deep: true })
 
 const marker = computed(() => {
@@ -72,9 +99,21 @@ defineExpose({
 </script>
 
 <template>
-  <div class="score-host w-full overflow-x-auto">
+  <div ref="hostRoot" class="score-host w-full overflow-x-auto text-center">
     <div class="score-wrap">
       <div ref="host" />
+      <button
+        v-for="(b, m) in measureBounds"
+        v-show="props.selectable"
+        :key="'mh-' + m"
+        type="button"
+        class="score-measure-hit"
+        :class="{ 'is-selected': !props.isPlaying && m === selectedMeasure }"
+        :style="{ left: b.x + 'px', width: b.width + 'px', height: scoreHeight + 'px' }"
+        :disabled="props.isPlaying"
+        :aria-label="`Select measure ${m + 1}`"
+        @click="store.setSelectedMeasure(m)"
+      />
       <div
         v-if="marker"
         class="score-marker"
@@ -112,6 +151,27 @@ defineExpose({
     left 60ms linear,
     width 60ms linear;
   border-radius: 2px;
+}
+
+.score-measure-hit {
+  position: absolute;
+  top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+  z-index: 1;
+}
+.score-measure-hit:hover:not(:disabled) {
+  background: hsl(var(--primary) / 0.05);
+}
+.score-measure-hit.is-selected {
+  background: hsl(var(--primary) / 0.08);
+  box-shadow: inset 0 -2px 0 0 hsl(var(--primary) / 0.55);
+}
+.score-measure-hit:disabled {
+  cursor: default;
 }
 
 /* Live MIDI marker — sits on top of the actual notehead so the user can read

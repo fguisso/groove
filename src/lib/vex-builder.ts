@@ -187,11 +187,17 @@ export interface StepMarker {
   width: number // width of marker in svg pixels
 }
 
+export interface MeasureBounds {
+  x: number // left edge of the measure (incl. clef/time-sig area on m=0) in svg pixels
+  width: number
+}
+
 export interface RenderResult {
   svg: SVGSVGElement | null
   height: number
   stepMarkers: StepMarker[] // one per step in the whole groove, pointing at the note that rings during that step
   voiceY: Record<VoiceId, number> // exact Y in svg pixels per voice — drives live MIDI marker placement on the staff
+  measureBounds: MeasureBounds[] // one per measure — drives click-to-select-measure in the editor
 }
 
 export function renderScore(
@@ -202,7 +208,7 @@ export function renderScore(
   container.innerHTML = ''
   const stepsPerMeasure = g.division
   const measures = g.measures
-  const width = opts.width ?? Math.max(360, Math.min(1100, container.clientWidth || 720))
+  const width = opts.width ?? Math.max(360, container.clientWidth || 720)
   const measureWidth = Math.max(180, (width - 40) / measures)
   const totalWidth = 40 + measureWidth * measures
   const height = 200
@@ -216,9 +222,12 @@ export function renderScore(
   const beatGroup = new Fraction(1, 4)
   const stepMarkers: StepMarker[] = []
   const voiceY = {} as Record<VoiceId, number>
+  const measureBounds: MeasureBounds[] = []
 
   for (let m = 0; m < measures; m++) {
-    const stave = new Stave(20 + m * measureWidth, 56, measureWidth)
+    const staveX = 20 + m * measureWidth
+    measureBounds.push({ x: staveX, width: measureWidth })
+    const stave = new Stave(staveX, 56, measureWidth)
     if (m === 0) stave.addClef('percussion').addTimeSignature(`${g.timeSig[0]}/${g.timeSig[1]}`)
     stave.setContext(ctx).draw()
 
@@ -286,5 +295,6 @@ export function renderScore(
     height,
     stepMarkers,
     voiceY,
+    measureBounds,
   }
 }
