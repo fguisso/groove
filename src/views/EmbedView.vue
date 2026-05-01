@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { ExternalLink } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
@@ -14,6 +15,12 @@ const route = useRoute()
 
 // Read-only when ?ro=1 appears in the hash's query part
 const readOnly = computed(() => route.query.ro === '1')
+
+const editorUrl = computed(() => {
+  const payload = route.params.payload as string | undefined
+  const base = `${location.origin}${location.pathname}`
+  return payload ? `${base}#/g/${payload}` : `${base}#/`
+})
 
 useUrlSync({ writeBack: false })
 
@@ -48,9 +55,21 @@ watch(groove, postHeight, { deep: true })
 
 <template>
   <div ref="host" class="w-full p-3 space-y-3 relative">
-    <div v-if="groove.title || groove.author" class="text-sm">
-      <span class="font-semibold">{{ groove.title }}</span>
-      <span v-if="groove.author" class="text-muted-foreground"> — {{ groove.author }}</span>
+    <div class="flex items-center gap-3 text-sm">
+      <div v-if="groove.title || groove.author" class="min-w-0 flex-1 truncate">
+        <span class="font-semibold">{{ groove.title }}</span>
+        <span v-if="groove.author" class="text-muted-foreground"> — {{ groove.author }}</span>
+      </div>
+      <a
+        :href="editorUrl"
+        target="_blank"
+        rel="noopener"
+        class="ml-auto inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+        title="Open this groove in the editor"
+      >
+        <ExternalLink class="h-3 w-3" :stroke-width="2" />
+        <span>Edit</span>
+      </a>
     </div>
     <Score :active-step="currentStep" :is-playing="isPlaying" :selectable="false" />
     <Transport :is-playing="isPlaying" :read-only="readOnly" @play="play(groove)" @stop="stop()" />
