@@ -27,7 +27,18 @@
       // tracker. Instead we disable the wrapping and manually emit one
       // pageview after the script loads — that records the visit
       // without bookkeeping every keystroke.
+      //
+      // Iframes get an `embed-load` custom event instead of a pageview:
+      // the embed view is the same SPA, so a host page with N embeds
+      // would otherwise count as N pageviews per visit. Events still
+      // show up in Tianji but don't inflate the pageview metric.
       if (location.hostname === 'guisso.dev') {
+        var inIframe
+        try {
+          inIframe = window.self !== window.top
+        } catch (e) {
+          inIframe = true
+        }
         var s = document.createElement('script')
         s.async = true
         s.defer = true
@@ -36,7 +47,11 @@
         s.setAttribute('data-auto-track', 'false')
         s.onload = function () {
           if (window.tianji && typeof window.tianji.track === 'function') {
-            window.tianji.track()
+            if (inIframe) {
+              window.tianji.track('embed-load')
+            } else {
+              window.tianji.track()
+            }
           }
         }
         document.head.appendChild(s)
