@@ -227,13 +227,18 @@ export function renderScore(
   // Wrap measures onto new rows once they'd get too narrow to read, like a real
   // score. A handful of measures still stretch to fill the available width.
   const PADDING_X = 20
-  const MIN_MEASURE_W = 240
   const ROW_HEIGHT = 120
   const STAVE_TOP_IN_ROW = 40 // headroom above each stave for the sticking glyphs
-  const avail = Math.max(MIN_MEASURE_W, width - PADDING_X * 2)
-  const perRow = Math.min(measures, Math.max(1, Math.floor(avail / MIN_MEASURE_W)))
+  // Each measure needs room to space its steps legibly; dense divisions (24ths,
+  // 32nds) need more than the base minimum. If even one measure can't fit the
+  // container we keep it at this width and let the score-host scroll, rather
+  // than handing the formatter too little width and pushing notes past the
+  // barline (the old 24ths-in-embed clip).
+  const minMeasureW = Math.max(240, stepsPerMeasure * 16)
+  const avail = Math.max(minMeasureW, width - PADDING_X * 2)
+  const perRow = Math.min(measures, Math.max(1, Math.floor(avail / minMeasureW)))
   const rows = Math.ceil(measures / perRow)
-  const measureWidth = avail / perRow
+  const measureWidth = Math.max(minMeasureW, avail / perRow)
   const totalWidth = PADDING_X * 2 + measureWidth * perRow
   const height = rows * ROW_HEIGHT + 20
 
