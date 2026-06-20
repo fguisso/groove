@@ -153,7 +153,10 @@ watch(
         v-for="(m, i) in visibleMeasures"
         :key="'measure-' + m"
         :ref="(el) => setMeasureRef(el as Element | null, i)"
-        :class="props.isPlaying ? 'play-stack__measure' : ''"
+        :class="[
+          props.isPlaying ? 'play-stack__measure' : '',
+          props.isPlaying && m === activeMeasure ? 'is-active' : '',
+        ]"
       >
         <div
           v-if="props.isPlaying"
@@ -247,5 +250,11 @@ watch(
 }
 .play-stack__measure + .play-stack__measure {
   border-top: 1px solid hsl(var(--border));
+}
+/* Highlight the bar that is currently sounding so the eye can follow the loop
+   through the stack without hunting for the (subtler) label colour. */
+.play-stack__measure.is-active {
+  background: hsl(var(--primary) / 0.06);
+  box-shadow: inset 3px 0 0 0 hsl(var(--primary) / 0.65);
 }
 </style>
