@@ -21,9 +21,7 @@ const { connected: midiConnected } = storeToRefs(midi)
 
 function onClear() {
   const hasAny =
-    groove.value.voices.hh.some((v) => v !== 0) ||
-    groove.value.voices.sn.some((v) => v !== 0) ||
-    groove.value.voices.kk.some((v) => v !== 0) ||
+    Object.values(groove.value.voices).some((arr) => arr?.some((v) => v !== 0)) ||
     groove.value.sticking.some((s) => s !== '-')
   if (!hasAny) return
   if (window.confirm('Clear all notes from this groove? This cannot be undone.')) {
