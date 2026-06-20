@@ -29,6 +29,8 @@ function steps(): DriveStep[] {
         title: 'Welcome to Groove 🥁',
         description:
           'A drum groove editor that lives entirely in your browser. Build a beat, hear it, read it on a staff, and share the whole thing as a single link. Here is a quick tour. Hit Next.',
+        // No Back button on the first step; there is nowhere to go back to.
+        showButtons: ['next', 'close'],
       },
     },
     {
