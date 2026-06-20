@@ -166,6 +166,14 @@ function toStaveNote(b: Built): StaveNote {
   return note
 }
 
+// Lift the R/L glyphs clear of the staff top, the hi-hat x-heads (which sit
+// just above the top line), and the beam group above them. Stickings live on
+// invisible ghost notes, so VexFlow's 'top' justification parks them at the
+// staff top — right on the x-heads — with no awareness of the main voice's
+// beam. setYShift is a no-op under top/bottom justification, so we push them
+// up by whole text lines instead; ~3 lines clears the beat-group beam.
+const STICKING_TEXT_LINE = 3
+
 function buildStickingNotes(g: Groove, measureStart: number): GhostNote[] {
   const div = g.division
   // Ghost notes at base step resolution. cellDuration for single step:
@@ -175,7 +183,9 @@ function buildStickingNotes(g: Groove, measureStart: number): GhostNote[] {
     const stk = g.sticking[measureStart + i]
     const n = new GhostNote(stepDur)
     if (stk && stk !== '-') {
-      n.addModifier(new Annotation(stk).setVerticalJustification('top'))
+      n.addModifier(
+        new Annotation(stk).setVerticalJustification('top').setTextLine(STICKING_TEXT_LINE),
+      )
     }
     notes.push(n)
   }
