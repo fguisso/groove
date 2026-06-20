@@ -329,3 +329,85 @@
     background: hsl(var(--background) / 0.7);
   }
 }
+
+/* Guided tour (driver.js), themed to the app's design tokens. Two-class
+   selectors (.driver-popover.groove-tour) outrank driver.css defaults. */
+.driver-popover.groove-tour {
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px -12px hsl(220 40% 2% / 0.45);
+  max-width: 320px;
+}
+.driver-popover.groove-tour .driver-popover-title {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.driver-popover.groove-tour .driver-popover-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.driver-popover.groove-tour .driver-popover-progress-text {
+  color: hsl(var(--muted-foreground));
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.driver-popover.groove-tour .driver-popover-arrow {
+  border-color: hsl(var(--popover));
+}
+/* Keep room for the absolutely-positioned close button so the title never
+   slides under it. */
+.driver-popover.groove-tour .driver-popover-title {
+  padding-right: 1.25rem;
+}
+/* Navigation buttons (Back / Next / Done). Override driver's 4px gap with a
+   roomier one and reset the default left margin so the gap is the only spacer. */
+.driver-popover.groove-tour .driver-popover-navigation-btns {
+  gap: 0.5rem;
+}
+.driver-popover.groove-tour .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+}
+.driver-popover.groove-tour button.driver-popover-next-btn,
+.driver-popover.groove-tour button.driver-popover-prev-btn {
+  all: unset;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.7rem;
+  border-radius: calc(var(--radius) - 0.2rem);
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  transition:
+    color 120ms ease-out,
+    background 120ms ease-out,
+    border-color 120ms ease-out;
+}
+.driver-popover.groove-tour button.driver-popover-prev-btn:hover {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--primary) / 0.5);
+}
+.driver-popover.groove-tour button.driver-popover-next-btn {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+.driver-popover.groove-tour button.driver-popover-next-btn:hover {
+  filter: brightness(1.08);
+}
+/* Close (×) button: driver positions it absolutely (top/right). Only retint it
+   — do NOT `all: unset`, which would strip that positioning and misplace it. */
+.driver-popover.groove-tour button.driver-popover-close-btn {
+  color: hsl(var(--muted-foreground));
+}
+.driver-popover.groove-tour button.driver-popover-close-btn:hover {
+  color: hsl(var(--foreground));
+}

@@ -143,8 +143,8 @@ watch(
 </script>
 
 <template>
-  <section class="panel">
-    <div v-if="!props.isPlaying" class="px-3 pt-3">
+  <section class="panel" data-tour="grid">
+    <div v-if="!props.isPlaying" class="px-3 pt-3" data-tour="measures">
       <MeasureTabs />
     </div>
 

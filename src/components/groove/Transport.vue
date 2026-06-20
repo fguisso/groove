@@ -40,12 +40,13 @@ function onMinutesInput(e: Event) {
 </script>
 
 <template>
-  <section class="panel flex flex-wrap items-center gap-5 p-3">
+  <section class="panel flex flex-wrap items-center gap-5 p-3" data-tour="transport">
     <button
       v-if="!props.isPlaying"
       type="button"
       class="transport-play"
       aria-label="Play"
+      data-tour="play"
       @click="emit('play')"
     >
       <Play class="h-5 w-5 translate-x-0.5" :stroke-width="2.5" />
@@ -96,7 +97,7 @@ function onMinutesInput(e: Event) {
       >
     </div>
 
-    <div class="flex items-center gap-4 ml-auto">
+    <div class="flex items-center gap-4 ml-auto" data-tour="playback-options">
       <label
         v-if="!props.readOnly"
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"

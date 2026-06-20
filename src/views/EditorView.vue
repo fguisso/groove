@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore, type LiveMarkerGrade } from '@/stores/midi'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
+import { useTour } from '@/composables/useTour'
 import { DIVISIONS } from '@/lib/model'
 import { VOICES } from '@/lib/voices'
 import TopBar from '@/components/shell/TopBar.vue'
@@ -23,6 +24,7 @@ const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 const midi = useMidiStore()
 const practiceTimer = usePracticeTimerStore()
+const { maybeAutoStart } = useTour()
 useUrlSync()
 
 const { isPlaying, currentStep, countInBeat, practiceTimerVal, play, stop, updateRuntime } =
@@ -101,6 +103,8 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   practiceTimer.setOnExpire(() => onStop())
+  // Defer so the grid/score have painted before the tour anchors to them.
+  nextTick(() => maybeAutoStart())
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
@@ -126,7 +130,7 @@ async function onExportPng() {
 
     <main class="flex-1 px-4 py-5 space-y-4 max-w-[1200px] w-full mx-auto">
       <div class="flex flex-wrap items-center gap-4 text-sm">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2" data-tour="division">
           <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
             >Division</label
           >
@@ -146,7 +150,7 @@ async function onExportPng() {
         </div>
       </div>
 
-      <div class="relative">
+      <div class="relative" data-tour="score">
         <Score ref="scoreRef" :active-step="currentStep" :is-playing="isPlaying" />
         <PracticeClock />
       </div>

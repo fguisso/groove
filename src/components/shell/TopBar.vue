@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { Github, Share2, Trash2, Settings } from 'lucide-vue-next'
+import { Github, Share2, Trash2, Settings, HelpCircle } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import GrooveLogo from '@/components/shell/GrooveLogo.vue'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore } from '@/stores/midi'
+import { useTour } from '@/composables/useTour'
 
 defineEmits<{
   (e: 'share'): void
 }>()
+
+const { startTour } = useTour()
 
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
@@ -44,7 +47,7 @@ function onClear() {
       </span>
     </a>
 
-    <div class="flex-1 flex flex-wrap items-center gap-2 min-w-[200px]">
+    <div class="flex-1 flex flex-wrap items-center gap-2 min-w-[200px]" data-tour="naming">
       <Input
         class="max-w-[240px]"
         placeholder="Untitled groove"
@@ -70,6 +73,16 @@ function onClear() {
       >
         <Github class="h-3.5 w-3.5" />
       </a>
+      <button
+        type="button"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        title="Take the guided tour"
+        aria-label="Take the guided tour"
+        data-tour="help"
+        @click="startTour"
+      >
+        <HelpCircle class="h-3.5 w-3.5" />
+      </button>
       <Button
         variant="ghost"
         size="sm"
@@ -83,6 +96,7 @@ function onClear() {
         size="sm"
         :title="midiConnected ? 'Settings (MIDI connected)' : 'Settings'"
         class="relative"
+        data-tour="settings"
         @click="midi.togglePanel()"
       >
         <Settings class="h-3.5 w-3.5" /> Settings
@@ -92,7 +106,9 @@ function onClear() {
           aria-hidden="true"
         />
       </Button>
-      <Button size="sm" @click="$emit('share')"> <Share2 class="h-3.5 w-3.5" /> Share </Button>
+      <Button size="sm" data-tour="share" @click="$emit('share')">
+        <Share2 class="h-3.5 w-3.5" /> Share
+      </Button>
     </div>
   </header>
 </template>

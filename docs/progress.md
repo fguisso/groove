@@ -4,6 +4,41 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-06-19 — Guided tour (driver.js)
+
+**Status:** A first-run guided tour walks new visitors through the editor — naming, division, the grid, multi-measure tabs, the staff, playback, practice tools, settings/MIDI, and sharing. Auto-starts once per browser; replayable anytime from a new `?` (help) button in the top bar. Editor-only — embeds never load it.
+
+**Done:**
+
+- Added `driver.js@1.4.0` as a dependency.
+- `src/composables/useTour.ts` (new) — owns the tour. Exports `useTour()` returning `startTour()` (manual replay) and `maybeAutoStart()` (first-visit only). 11 steps, each anchored to a `[data-tour="…"]` selector (welcome step is element-less / centered). `onDestroyed` writes a `groove:tourSeen` version flag to `localStorage`; `maybeAutoStart` no-ops once `seenVersion() >= TOUR_VERSION`. A `TOUR_VERSION` const lets a future content refresh re-trigger the auto-start for returning users. All `localStorage` access is `try/catch`-wrapped (private mode just forgets the tour).
+- `data-tour` anchors added across existing components — no behavior changes: `TopBar.vue` (`naming`, `settings`, `share`, plus the new `help` button), `EditorView.vue` (`division`, `score`), `Transport.vue` (`transport`, `play`, `playback-options`), `GrooveGrid.vue` (`grid`), with `measures` on the MeasureTabs wrapper.
+- `TopBar.vue` — new icon-only `?` button (lucide `HelpCircle`) between the GitHub link and Clear; calls `startTour()`.
+- `EditorView.vue` — `onMounted` calls `maybeAutoStart()` inside `nextTick` so the grid/score have painted before the tour anchors to them.
+- `src/styles/tailwind.css` — themed the popover via `.driver-popover.groove-tour` (two-class selectors outrank `driver.css` defaults, so no `!important`). Mono title, muted description, teal primary Next button, token-driven borders/shadow. Buttons reset with `all: unset` then restyled.
+
+**Decisions:**
+
+- **Tour lives in a composable, not a component.** Both `TopBar` (manual) and `EditorView` (auto) need to trigger it; a composable avoids prop/event plumbing and keeps the step copy in one place.
+- **`data-tour` attributes over CSS-class/id coupling.** The tour shouldn't pin itself to styling classes that may change; dedicated data attributes are an explicit, greppable contract.
+- **Editor-only by construction.** `useTour` is imported only by `TopBar` and `EditorView`; `EmbedView` pulls neither, so `driver.js` + its CSS stay out of the embed chunk (verified in the build output — `EmbedView` chunk unchanged, driver lands in the `EditorView` chunk).
+- **Auto-start gated by a versioned flag, not a boolean.** Bumping `TOUR_VERSION` re-surfaces the tour to people who already dismissed it when a future step is worth re-showing. `localStorage` is allowed here per `docs/conventions.md` (transient UX state, never a URL substitute).
+- **Copy in English.** Matches the rest of the app UI and the docs-in-English convention, even though prior chat was in Portuguese.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), vite build all pass.
+
+**Verified in browser:** auto-start on first load, popover theming, element spotlight + auto-scroll to the grid step, the `?` button replaying the tour, and the `groove:tourSeen` flag being written on close (so it doesn't auto-start twice).
+
+**Follow-up polish (same day):**
+
+- Removed em-dashes from all step copy and from code comments (user prefers no travessão in text). Standard hyphenated terms like "hi-hat" and "count-in" stay.
+- Fixed the close (×) button: the earlier `all: unset` had stripped driver.css's `position: absolute; top; right`, throwing the × out of alignment. The close button is now only re-tinted, never reset, so it keeps its corner placement; added `padding-right` on the title so longer titles never slide under it.
+- Fixed Back/Next/Done spacing: they were glued together by driver's default 4px margin. Reset that margin and put a `0.5rem` gap on `.driver-popover-navigation-btns` instead.
+
+**Next:** If the step copy drifts from the UI as features land, bump `TOUR_VERSION` to re-show it. Could add a tour step for the embed-specific affordances if an embed-side walkthrough is ever wanted (separate step list, since embed chrome differs).
+
+---
+
 ## 2026-05-01 — Practice timer (bounded loop session with on-screen clock)
 
 **Status:** New control next to the Loop toggle lets the user pick a duration in minutes; an mm:ss clock sits between the staff and the transport. Hitting play with the timer enabled starts the countdown; at zero, playback auto-stops. Works in editor and embed (including `?ro=1`).
