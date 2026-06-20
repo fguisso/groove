@@ -4,6 +4,19 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-06-19: Two follow-up fixes (URL re-decode, tour Back)
+
+**Status:** Cleared the two minor items the earlier Chrome pass left open.
+
+**Done:**
+
+- **`useUrlSync` now re-decodes on payload change.** It only decoded once at setup, so a `:payload` swap without a remount (pasting a different share link in the address bar) updated the URL but kept the old groove. Added a `watch(() => route.params.payload, ...)` that re-decodes, guarded by a `lastWritten` string so our own write-back does not trigger a redundant reload. Works for the editor and the read-only embed. Verified in-browser: switching payloads in the address bar now swaps the groove.
+- **Tour hides Back on step 1.** The welcome step had a clickable, no-op Back button. Set its popover `showButtons: ['next', 'close']`. Verified step 1 shows only Next/close and Back returns from step 2 on.
+
+**Sensors:** typecheck, eslint, prettier check all pass.
+
+---
+
 ## 2026-06-19: Manual Chrome bug-hunt and four fixes
 
 **Status:** Drove the app in Chrome looking for new bugs, then fixed four: a severe division-change regression, the Clear guard missing tom/ride lanes, the sticking-over-staff overlap (from `bugs.md`), and multi-measure line wrapping (from `bugs.md`). Plus a "32ths" label typo.
