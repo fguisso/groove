@@ -4,6 +4,33 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-06-19: Manual Chrome bug-hunt and four fixes
+
+**Status:** Drove the app in Chrome looking for new bugs, then fixed four: a severe division-change regression, the Clear guard missing tom/ride lanes, the sticking-over-staff overlap (from `bugs.md`), and multi-measure line wrapping (from `bugs.md`). Plus a "32ths" label typo.
+
+**Done:**
+
+- **Division change was broken (severe, new find).** The `Select` UI component emitted the native `<select>` string value (`"8"`) and the `as unknown as T` cast did nothing at runtime, so `groove.division` became a string. Two failures cascaded: `encode()` threw `codec: unsupported division 8` (because `DIV_CODES.indexOf("8")` is `-1`), which left `useUrlSync`'s write-back dead so the URL silently stopped tracking edits; and `GrooveGrid`'s `v-for="i in stepsPerMeasure"` iterated a 1-char string, collapsing every lane to a single cell. Fixed at the root in `src/components/ui/Select.vue`: the change handler now maps the raw string back to the matching option and emits its typed `value`. Verified in-browser: switching to 8ths now renders 8 cells per lane, the hash updates, and no exception fires.
+- **Clear ignored tom and ride lanes (new find).** `TopBar.vue` `onClear` only checked `hh` / `sn` / `kk` / sticking when deciding whether there was anything to clear, so a tom-only or ride-only groove could not be cleared (silent no-op, the confirm never even showed). Now it scans every present voice via `Object.values(groove.voices)`, matching what `clearAll` already does.
+- **Stickings no longer collide with the staff (`bugs.md`).** Sticking `R` / `L` glyphs live on invisible ghost notes, so VexFlow's `top` justification parked them on the top staff line, right over the hi-hat x-heads and under the beam. `setYShift` is a no-op under top/bottom justification, so the fix uses `setTextLine(3)` in `vex-builder.ts` to lift them a few text lines clear of the beat-group beam. Verified at 8ths and beamed 16ths.
+- **Score wraps measures onto rows (`bugs.md`).** `renderScore` laid every measure in one ever-narrowing row. It now computes `perRow` from the available width against a 240px minimum measure width and stacks rows (`ROW_HEIGHT = 120`). `StepMarker` and `MeasureBounds` gained `y` / `height`; `voiceY` stays a row-0 baseline and `Score.vue` adds the step's row offset (`y + sm.y`) for live MIDI markers. The playhead bar and the click-to-select overlays now position per row. Verified: 8 measures wrap to two rows in the editor (4+4) and the wider embed (5+3), measure selection works on row 2, and the playhead tracks the right row during playback. Single-measure rendering unchanged.
+- **`32ths` to `32nds`** in the division dropdown label (`EditorView.vue`).
+
+**Decisions:**
+
+- **Fix the division bug in `Select.vue`, not at the call site.** `Select` is generic over `string | number` and is used only once today, but emitting a typed `value` is the component honoring its own contract, so any future numeric select is safe too. A `Number($event)` patch in `EditorView` would have masked the same latent bug elsewhere.
+- **Stickings via `setTextLine`, not a pixel shift.** `setYShift` silently does nothing for top-justified annotations; text lines are the API VexFlow actually respects, and they keep stickings at a consistent height above the staff regardless of whether a given beat is beamed.
+- **Wrap keeps a single VexFlow voice per measure, just repositioned.** Rather than reflow notes across a system break, each measure still renders independently; only its stave x/y moves. That kept the change contained and left the per-measure marker/selection math intact (just add a row offset).
+- **Uniform measure width across rows.** The last row's measures keep the same width instead of stretching to fill, which reads more like a real chart and avoids a jarring width jump on the final line.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), and `npm run build` all pass.
+
+**Newly found, left open (logged in `bugs.md`):** pasting a different share link in the address bar does not reload the groove (`useUrlSync` decodes once at mount and does not watch the route); the tour's "Back" button is clickable on step 1. Both are low severity.
+
+**Next:** The two remaining staff items in `bugs.md` (24ths clipped in a single-measure embed, 16ths note past the barline) were not part of this pass. The single-measure 24ths clip is a per-measure note-density issue that wrapping does not address.
+
+---
+
 ## 2026-06-19 — Guided tour (driver.js)
 
 **Status:** A first-run guided tour walks new visitors through the editor — naming, division, the grid, multi-measure tabs, the staff, playback, practice tools, settings/MIDI, and sharing. Auto-starts once per browser; replayable anytime from a new `?` (help) button in the top bar. Editor-only — embeds never load it.
