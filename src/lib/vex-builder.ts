@@ -195,11 +195,15 @@ function buildStickingNotes(g: Groove, measureStart: number): GhostNote[] {
 export interface StepMarker {
   x: number // left edge of marker in svg pixels
   width: number // width of marker in svg pixels
+  y: number // top of the row band this step lives in (drives the playhead bar + per-row marker offset)
+  height: number // row band height in svg pixels
 }
 
 export interface MeasureBounds {
   x: number // left edge of the measure (incl. clef/time-sig area on m=0) in svg pixels
   width: number
+  y: number // top of the row band this measure lives in
+  height: number // row band height in svg pixels
 }
 
 export interface RenderResult {
@@ -219,9 +223,19 @@ export function renderScore(
   const stepsPerMeasure = g.division
   const measures = g.measures
   const width = opts.width ?? Math.max(360, container.clientWidth || 720)
-  const measureWidth = Math.max(180, (width - 40) / measures)
-  const totalWidth = 40 + measureWidth * measures
-  const height = 200
+
+  // Wrap measures onto new rows once they'd get too narrow to read, like a real
+  // score. A handful of measures still stretch to fill the available width.
+  const PADDING_X = 20
+  const MIN_MEASURE_W = 240
+  const ROW_HEIGHT = 120
+  const STAVE_TOP_IN_ROW = 40 // headroom above each stave for the sticking glyphs
+  const avail = Math.max(MIN_MEASURE_W, width - PADDING_X * 2)
+  const perRow = Math.min(measures, Math.max(1, Math.floor(avail / MIN_MEASURE_W)))
+  const rows = Math.ceil(measures / perRow)
+  const measureWidth = avail / perRow
+  const totalWidth = PADDING_X * 2 + measureWidth * perRow
+  const height = rows * ROW_HEIGHT + 20
 
   const renderer = new Renderer(container, Renderer.Backends.SVG)
   renderer.resize(totalWidth, height)
@@ -235,13 +249,18 @@ export function renderScore(
   const measureBounds: MeasureBounds[] = []
 
   for (let m = 0; m < measures; m++) {
-    const staveX = 20 + m * measureWidth
-    measureBounds.push({ x: staveX, width: measureWidth })
-    const stave = new Stave(staveX, 56, measureWidth)
+    const row = Math.floor(m / perRow)
+    const col = m % perRow
+    const rowTop = row * ROW_HEIGHT
+    const staveX = PADDING_X + col * measureWidth
+    const staveY = rowTop + STAVE_TOP_IN_ROW
+    measureBounds.push({ x: staveX, y: rowTop, width: measureWidth, height: ROW_HEIGHT })
+    const stave = new Stave(staveX, staveY, measureWidth)
     if (m === 0) stave.addClef('percussion').addTimeSignature(`${g.timeSig[0]}/${g.timeSig[1]}`)
     stave.setContext(ctx).draw()
 
-    // Lines are identical across measures — capture Y once on the first stave.
+    // Lines are identical across rows — capture the row-0 stave Y per voice.
+    // Live markers on lower rows reuse this base and add their rowTop offset.
     if (m === 0) {
       for (const v of VOICES) voiceY[v.id] = stave.getYForLine(VOICE_LINE[v.id])
     }
@@ -296,7 +315,12 @@ export function renderScore(
       const headBegin = note.getNoteHeadBeginX?.() ?? note.getAbsoluteX()
       const headEnd = note.getNoteHeadEndX?.() ?? headBegin + 10
       const center = (headBegin + headEnd) / 2
-      stepMarkers.push({ x: center - markerWidth / 2, width: markerWidth })
+      stepMarkers.push({
+        x: center - markerWidth / 2,
+        width: markerWidth,
+        y: row * ROW_HEIGHT,
+        height: ROW_HEIGHT,
+      })
     }
   }
 

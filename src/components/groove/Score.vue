@@ -18,7 +18,6 @@ const { markers } = storeToRefs(midi)
 const hostRoot = ref<HTMLDivElement | null>(null)
 const host = ref<HTMLDivElement | null>(null)
 const stepMarkers = ref<StepMarker[]>([])
-const scoreHeight = ref(200)
 const voiceY = ref<Record<VoiceId, number>>({} as Record<VoiceId, number>)
 const measureBounds = ref<MeasureBounds[]>([])
 
@@ -39,7 +38,6 @@ function redraw() {
   try {
     const res = renderScore(host.value, groove.value, { width: availableWidth() })
     stepMarkers.value = res.stepMarkers
-    scoreHeight.value = res.height
     voiceY.value = res.voiceY
     measureBounds.value = res.measureBounds
   } catch (e) {
@@ -86,7 +84,8 @@ const markerPositions = computed<MarkerPosition[]>(() => {
     out.push({
       id: m.id,
       x: sm.x + sm.width / 2,
-      y,
+      // voiceY is the row-0 baseline; sm.y shifts it down to the step's row.
+      y: y + sm.y,
       cls: `score-live-marker score-live-marker--${m.grade}`,
     })
   }
@@ -109,7 +108,12 @@ defineExpose({
         type="button"
         class="score-measure-hit"
         :class="{ 'is-selected': !props.isPlaying && m === selectedMeasure }"
-        :style="{ left: b.x + 'px', width: b.width + 'px', height: scoreHeight + 'px' }"
+        :style="{
+          left: b.x + 'px',
+          top: b.y + 'px',
+          width: b.width + 'px',
+          height: b.height + 'px',
+        }"
         :disabled="props.isPlaying"
         :aria-label="`Select measure ${m + 1}`"
         @click="store.setSelectedMeasure(m)"
@@ -119,8 +123,9 @@ defineExpose({
         class="score-marker"
         :style="{
           left: marker.x + 'px',
+          top: marker.y + 'px',
           width: marker.width + 'px',
-          height: scoreHeight + 'px',
+          height: marker.height + 'px',
         }"
       />
       <div
