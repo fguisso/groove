@@ -4,6 +4,27 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-06-19: Cleared the remaining bugs.md backlog (dense-division clip, active-measure follow)
+
+**Status:** Closed the last three `bugs.md` items: the 24ths-in-embed clip, the 16ths note past the barline, and following measures during playback.
+
+**Done:**
+
+- **Dense divisions get a minimum measure width (fixes 24ths and 16ths clipping).** `renderScore` used a fixed `MIN_MEASURE_W = 240`, so at narrow widths or many measures the formatter was handed less width than it needed and notes spilled past the barline. The minimum is now `max(240, stepsPerMeasure * 16)`, and `measureWidth = max(minMeasureW, avail / perRow)`. When even one measure cannot fit the container it keeps the legible width and the `score-host` (already `overflow-x-auto`) scrolls, rather than cramming notes. Both the 24ths-embed clip and the 16ths-sticking note-past-the-barline shared this root cause (formatter starved of width); the earlier multi-measure wrap had already mitigated the worst case. Verified by constraining the host to 280-300px and confirming the SVG renders at the min measure width and the container scrolls, with notes inside the barline.
+- **Active measure is highlighted during playback (follow the loop).** Playback already stacks every measure and auto-scrolls to the active one, but the only cue was the measure label colour. The active measure block now also gets a teal background tint and a 3px inset left border (`.play-stack__measure.is-active`), driven by the existing `activeMeasure` computed. Verified in-browser: the highlight moves bar to bar with the loop.
+
+**Decisions:**
+
+- **Minimum width scales with step count, not a flat value.** 16ths and below keep the old 240 floor; 24ths and 32nds need more room per step, so the floor tracks `stepsPerMeasure`. The floor only bites in narrow containers (embeds), where horizontal scroll is an acceptable trade for legible, un-clipped notes.
+- **Treated #2 as a width bug, not a structural one.** The bugs.md note guessed at a beam/tuplet cause, but the note only escaped the barline when measures were starved of width (pre-wrap, ~145px bars). Wrap plus the density minimum keep bars wide enough, so the same fix covers both #1 and #2.
+- **Follow via a block highlight, not auto-switching a single-measure view.** The stack already exists for playback; making the active block obvious is less disruptive than collapsing back to one measure and auto-advancing tabs.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), and `npm run build` all pass.
+
+**Backlog:** `bugs.md` is now empty of known issues.
+
+---
+
 ## 2026-06-19: Two follow-up fixes (URL re-decode, tour Back)
 
 **Status:** Cleared the two minor items the earlier Chrome pass left open.
