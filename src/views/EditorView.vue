@@ -136,7 +136,7 @@ async function onExportPng() {
           >
           <Select
             :model-value="groove.division"
-            :options="DIVISIONS.map((d) => ({ label: String(d) + 'ths', value: d }))"
+            :options="DIVISIONS.map((d) => ({ label: d + (d === 32 ? 'nds' : 'ths'), value: d }))"
             @update:model-value="store.setDivision($event as typeof groove.division)"
           />
         </div>
