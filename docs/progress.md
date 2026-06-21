@@ -25,6 +25,8 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 **Caveat:** The early/perfect/late grade, the verdict badge, and the calibration readout only light up with a connected MIDI kit, which this environment doesn't have. The math is typecheck-clean and follows the audio-clock guidance, but the user should verify on the Aroma TDX 15S: steady on-beat hits should converge to "perfect" once the latency offset is dialed so "Last hit" reads ~0 ms; pushing/dragging should read early/late with sensible ms.
 
+**Follow-up (same day): guided tour refreshed for the new features.** `useTour.ts` bumped to `TOUR_VERSION = 2` (re-surfaces for returning users). The "Practice tools" step was re-anchored from `[data-tour="playback-options"]` to `[data-tour="transport"]` because the options group is now `display:none` on mobile (collapsed behind the Options accordion), which would have left driver.js highlighting a hidden element. Copy updated: the step now mentions Pause between loops and the Options button; the chart step mentions the centered auto-scroll; the Settings/MIDI step mentions early/perfect/late feedback. Verified at mobile width that `transport` is visible and `playback-options` is hidden, and that the tour auto-re-opens on the version bump.
+
 **Next (open from the list):** none of the original feedback items remain. Possible follow-ups: missed-note markers (expected notes the player didn't hit), and per-loop history so bars can be compared over time.
 
 ---

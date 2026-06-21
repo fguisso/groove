@@ -3,7 +3,9 @@ import 'driver.js/dist/driver.css'
 
 // Bumped when the tour gains a step worth re-surfacing to returning users.
 // Stored alongside the flag so a content refresh can re-trigger the auto-start.
-const TOUR_VERSION = 1
+// v2: chart auto-scroll, the Transport "Options" accordion + Pause between
+// loops, and early/perfect/late MIDI timing feedback.
+const TOUR_VERSION = 2
 const TOUR_SEEN_KEY = 'groove:tourSeen'
 
 function seenVersion(): number {
@@ -78,7 +80,7 @@ function steps(): DriveStep[] {
       popover: {
         title: 'Read it as a chart',
         description:
-          'Everything you enter renders live as a real percussion staff, beamed per beat, just like a drum chart. A marker rides along the notes while it plays.',
+          'Everything you enter renders live as a real percussion staff, beamed per beat, just like a drum chart. While it plays, a marker rides the notes and the chart scrolls to keep the current note centered.',
         side: 'bottom',
         align: 'center',
       },
@@ -94,13 +96,13 @@ function steps(): DriveStep[] {
       },
     },
     {
-      element: '[data-tour="playback-options"]',
+      element: '[data-tour="transport"]',
       popover: {
         title: 'Practice tools',
         description:
-          'Loop the bar, add swing, click in a metronome and a count-in, or set a timer that turns the loop into a bounded practice session and auto-stops when time is up.',
+          'Loop the bar, add swing, click in a metronome and a count-in, set a timer that auto-stops the session, or add a silent Pause between loops to review. On a narrow screen these sit behind the Options button.',
         side: 'top',
-        align: 'end',
+        align: 'center',
       },
     },
     {
@@ -108,7 +110,7 @@ function steps(): DriveStep[] {
       popover: {
         title: 'Settings & MIDI',
         description:
-          'Connect a MIDI drum kit for live hit feedback on the staff, export the groove as a .mid or .png file, and hide tom or cymbal lanes you are not using.',
+          'Connect a MIDI drum kit for live feedback: each hit lands on the staff graded early, perfect or late. Export the groove as a .mid or .png file, and hide tom or cymbal lanes you are not using.',
         side: 'bottom',
         align: 'end',
       },
