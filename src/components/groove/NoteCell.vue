@@ -40,8 +40,12 @@ const accent = computed(() => {
 
 const liveMarkerClass = computed(() => {
   switch (props.liveMarker) {
-    case 'on-time':
-      return 'live-marker live-marker-on-time'
+    case 'perfect':
+      return 'live-marker live-marker-perfect'
+    case 'early':
+      return 'live-marker live-marker-early'
+    case 'late':
+      return 'live-marker live-marker-late'
     case 'wrong-voice':
       return 'live-marker live-marker-wrong-voice'
     case 'off-time':

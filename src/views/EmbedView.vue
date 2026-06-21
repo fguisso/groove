@@ -7,6 +7,7 @@ import { useGrooveStore } from '@/stores/groove'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
+import { useWakeLock } from '@/composables/useWakeLock'
 import Score from '@/components/groove/Score.vue'
 import Transport from '@/components/groove/Transport.vue'
 import PracticeClock from '@/components/groove/PracticeClock.vue'
@@ -27,7 +28,13 @@ const editorUrl = computed(() => {
 
 useUrlSync({ writeBack: false })
 
-const { isPlaying, currentStep, countInBeat, play, stop } = usePlayback()
+const { isPlaying, currentStep, countInBeat, play, stop, setOnEnded } = usePlayback()
+const wakeLock = useWakeLock()
+
+watch(isPlaying, (playing) => {
+  if (playing) wakeLock.request()
+  else wakeLock.release()
+})
 
 function onPlay() {
   play(groove.value)
@@ -56,6 +63,7 @@ onMounted(() => {
   if (host.value) ro.observe(host.value)
   postHeight()
   practiceTimer.setOnExpire(() => onStop())
+  setOnEnded(() => practiceTimer.stop())
 })
 onBeforeUnmount(() => {
   ro?.disconnect()

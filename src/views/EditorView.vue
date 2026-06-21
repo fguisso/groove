@@ -6,6 +6,7 @@ import { useMidiStore, type LiveMarkerGrade } from '@/stores/midi'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
+import { useWakeLock } from '@/composables/useWakeLock'
 import { useTour } from '@/composables/useTour'
 import { DIVISIONS } from '@/lib/model'
 import { VOICES } from '@/lib/voices'
@@ -27,27 +28,70 @@ const practiceTimer = usePracticeTimerStore()
 const { maybeAutoStart } = useTour()
 useUrlSync()
 
-const { isPlaying, currentStep, countInBeat, practiceTimerVal, play, stop, updateRuntime } =
-  usePlayback()
+const {
+  isPlaying,
+  currentStep,
+  countInBeat,
+  practiceTimerVal,
+  play,
+  stop,
+  updateRuntime,
+  setOnEnded,
+  nearestStepNow,
+} = usePlayback()
+const wakeLock = useWakeLock()
 watch(
   () => [groove.value.tempo, groove.value.swing],
   () => updateRuntime(groove.value),
 )
 
+// Keep the screen awake while a groove is playing; release the moment it stops
+// (manual stop, natural end, or timer expiry all flip isPlaying to false).
+watch(isPlaying, (playing) => {
+  if (playing) wakeLock.request()
+  else wakeLock.release()
+})
+
+// Brief on-screen verdict for the most recent hit on a correct pad (early /
+// perfect / late + how many ms off), so the player gets immediate timing
+// feedback without hunting for the dot on the staff.
+const timingFeedback = ref<{ grade: 'perfect' | 'early' | 'late'; ms: number; id: number } | null>(
+  null,
+)
+let feedbackToken = 0
+
 // Live marker stamping: every MIDI hit during playback drops a marker on the
-// grid + tablature, graded against the programmed groove.
+// grid + tablature, graded against the programmed groove. For a correct pad the
+// grade refines into early / perfect / late using the audio-clock delta the
+// store captured at hit time (h.timing), offset by the user's latency setting.
 watch(
   () => midi.lastHit,
   (h) => {
     if (!h || !isPlaying.value) return
-    const step = currentStep.value
+    const timing = h.timing
+    const step = timing ? timing.step : currentStep.value
     if (step < 0) return
     const expected = (groove.value.voices[h.voiceId]?.[step] ?? 0) !== 0
     let grade: LiveMarkerGrade
-    if (expected) grade = 'on-time'
-    else if (VOICES.some((v) => (groove.value.voices[v.id]?.[step] ?? 0) !== 0))
-      grade = 'wrong-voice'
-    else grade = 'off-time'
+    if (!expected) {
+      grade = VOICES.some((v) => (groove.value.voices[v.id]?.[step] ?? 0) !== 0)
+        ? 'wrong-voice'
+        : 'off-time'
+    } else if (timing) {
+      const deltaMs = timing.deltaSec * 1000 - midi.latencyMs
+      const perfectWin = Math.max(8, midi.toleranceMs * 0.4)
+      if (deltaMs < -perfectWin) grade = 'early'
+      else if (deltaMs > perfectWin) grade = 'late'
+      else grade = 'perfect'
+      const fid = ++feedbackToken
+      timingFeedback.value = { grade, ms: Math.round(deltaMs), id: fid }
+      window.setTimeout(() => {
+        if (feedbackToken === fid) timingFeedback.value = null
+      }, 900)
+    } else {
+      // Correct pad but no audio-clock data (e.g. a hit landing in count-in).
+      grade = 'perfect'
+    }
     midi.pushMarker({ voiceId: h.voiceId, step, atMs: h.atMs, grade })
   },
 )
@@ -103,6 +147,16 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   practiceTimer.setOnExpire(() => onStop())
+  // A non-looping track that reaches its end resets to the first bar and clears
+  // the board (markers stay only in practice mode, matching manual stop).
+  setOnEnded(() => {
+    if (!midi.practiceMode) midi.clearMarkers()
+    practiceTimer.stop()
+    store.setSelectedMeasure(0)
+  })
+  // Grade incoming hits against the audio clock (captured synchronously in the
+  // store's MIDI handler, before Vue's flush moves the transport on).
+  midi.setHitTimingProvider(() => nearestStepNow())
   // Defer so the grid/score have painted before the tour anchors to them.
   nextTick(() => maybeAutoStart())
 })
@@ -110,6 +164,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   practiceTimer.setOnExpire(null)
   practiceTimer.stop()
+  midi.setHitTimingProvider(null)
 })
 
 const shareOpen = ref(false)
@@ -168,6 +223,30 @@ async function onExportPng() {
         class="count-in-overlay pointer-events-none fixed inset-x-0 top-24 z-40 flex justify-center"
       >
         <div :key="countInBeat" class="count-in-number">{{ countInBeat }}</div>
+      </div>
+    </Transition>
+
+    <Transition name="count-fade">
+      <div
+        v-if="timingFeedback"
+        class="pointer-events-none fixed inset-x-0 top-20 z-40 flex justify-center"
+      >
+        <div
+          :key="timingFeedback.id"
+          class="timing-badge"
+          :class="`timing-badge--${timingFeedback.grade}`"
+        >
+          <span>{{
+            timingFeedback.grade === 'perfect'
+              ? 'PERFECT'
+              : timingFeedback.grade === 'early'
+                ? 'EARLY'
+                : 'LATE'
+          }}</span>
+          <span v-if="timingFeedback.grade !== 'perfect'" class="timing-badge__ms">
+            {{ timingFeedback.ms > 0 ? '+' : '' }}{{ timingFeedback.ms }}ms
+          </span>
+        </div>
       </div>
     </Transition>
 
@@ -232,5 +311,38 @@ async function onExportPng() {
 }
 .count-fade-leave-to {
   opacity: 0;
+}
+
+.timing-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  animation: count-pulse 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.timing-badge__ms {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.timing-badge--perfect {
+  color: hsl(160 70% 45%);
+  background: hsl(160 70% 45% / 0.14);
+  text-shadow: 0 0 22px hsl(160 70% 45% / 0.5);
+}
+.timing-badge--early {
+  color: hsl(200 85% 58%);
+  background: hsl(200 85% 58% / 0.14);
+  text-shadow: 0 0 22px hsl(200 85% 58% / 0.5);
+}
+.timing-badge--late {
+  color: hsl(28 90% 56%);
+  background: hsl(28 90% 56% / 0.14);
+  text-shadow: 0 0 22px hsl(28 90% 56% / 0.5);
 }
 </style>

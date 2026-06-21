@@ -217,7 +217,7 @@ export interface RenderResult {
 export function renderScore(
   container: HTMLDivElement,
   g: Groove,
-  opts: { width?: number } = {},
+  opts: { width?: number; singleRow?: boolean } = {},
 ): RenderResult {
   container.innerHTML = ''
   const stepsPerMeasure = g.division
@@ -236,7 +236,11 @@ export function renderScore(
   // barline (the old 24ths-in-embed clip).
   const minMeasureW = Math.max(240, stepsPerMeasure * 16)
   const avail = Math.max(minMeasureW, width - PADDING_X * 2)
-  const perRow = Math.min(measures, Math.max(1, Math.floor(avail / minMeasureW)))
+  // During playback we lay every measure on one horizontal row so the chart can
+  // scroll behind a centered playhead instead of wrapping out of view.
+  const perRow = opts.singleRow
+    ? measures
+    : Math.min(measures, Math.max(1, Math.floor(avail / minMeasureW)))
   const rows = Math.ceil(measures / perRow)
   const measureWidth = Math.max(minMeasureW, avail / perRow)
   const totalWidth = PADDING_X * 2 + measureWidth * perRow

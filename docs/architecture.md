@@ -9,20 +9,21 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 - `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, synth dispatch keys, and an optional `group: 'tom' | 'cymbal'` for the editor's bulk-collapse toggles. Includes `voiceForMidiNote()` for MIDI input mapping (registry states + `INPUT_ONLY_MIDI` for kit-side notes like snare rim).
 - `model.ts` — `Groove` shape; `Voices` type guarantees `hh`/`sn`/`kk` are present; toms and ride are optional. Uses `voices.ts` for cycle helpers.
 - `codec.ts` — bit-packed binary, base64url-encoded for the URL fragment. v4 is registry-driven (presence bitmap over `VOICES` order, then cells in order). v3 stays read-only for legacy URLs (maps `t4`→`t3`, `cy`→`ride`).
-- `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths.
+- `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths. `renderScore(..., { singleRow })` lays every measure on one horizontal row (used during playback so the chart can scroll behind a centered playhead); paused, it wraps measures onto rows for readability.
 - `export-midi.ts` — `exportMidi(g)` writes a GM drum track (channel 10) via `@tonejs/midi`, looking up notes/velocities from the registry.
 - `export-png.ts` — score → PNG download.
 - `utils.ts` — `cn` class-merge helper.
 
 ### `src/composables/`
 
-- `usePlayback.ts` — owns Tone.js synth construction (kk, sn, hh closed/open/pedal, t1/t2/t3, ride, click), the `Tone.Part` scheduler, swing, count-in, and the playback `currentStep` ref. Voice dispatch reads `voices.ts`.
+- `usePlayback.ts` — owns Tone.js synth construction (kk, sn, hh closed/open/pedal, t1/t2/t3, ride, click), the `Tone.Part` scheduler, swing, count-in, and the playback `currentStep` ref. Voice dispatch reads `voices.ts`. When `loop` is off it schedules an explicit `end` event one step past the last note that tears down playback and fires the `setOnEnded` callback, so the UI never stays stuck in "playing". Manual `stop()` does not fire `onEnded`. Captures the playing timeline geometry and exposes `nearestStepNow()`, which projects the live `transport.seconds` onto the step grid (signed `deltaSec`) so a MIDI hit can be graded for timing off the audio clock.
 - `useUrlSync.ts` — keeps the `Groove` store in sync with the hash payload. Editor writes back; embed does not.
+- `useWakeLock.ts` — Screen Wake Lock wrapper. Keeps the phone awake while a groove plays; re-acquires on `visibilitychange` (the browser auto-releases when the page is hidden). Both views drive it via `watch(isPlaying)`. No-ops where the API is unsupported.
 
 ### `src/stores/`
 
 - `groove.ts` — Pinia store wrapping the current `Groove` plus a few editor-only flags. `selectedMeasure` (UI-only, not encoded in URL) drives the GrooveGrid single-measure mode and the Score click-to-select overlay.
-- `midi.ts` — Pinia store wrapping Web MIDI access, last-hit, latency/tolerance settings (persisted to `localStorage`), the live-marker list, the practice-mode toggle + review timer, the editor lane-visibility toggles (`showToms` / `showCymbals`, persisted), and the Settings drawer open flag. Shared by `MidiPanel`, `GrooveGrid`, `Score`, `TopBar`, and `EditorView`.
+- `midi.ts` — Pinia store wrapping Web MIDI access, last-hit (incl. an audio-clock `timing` captured synchronously via a `setHitTimingProvider` callback the editor registers), latency/tolerance settings (persisted to `localStorage`), the live-marker list (grade ∈ `perfect`/`early`/`late`/`wrong-voice`/`off-time`), the practice-mode toggle + review timer (surfaced as the Transport's "Pause between loops"), the editor lane-visibility toggles (`showToms` / `showCymbals`, persisted), and the Settings drawer open flag. Shared by `MidiPanel`, `GrooveGrid`, `Score`, `TopBar`, `Transport`, and `EditorView`.
 
 ### `src/views/`
 
@@ -88,5 +89,5 @@ Source of truth: `src/lib/voices.ts`. Keep this table in sync if voices change.
 
 - **Beam grouping assumes simple meters.** Compound meters render as straight eighths (`vex-builder.ts` TODO).
 - **No missed-note markers yet.** The live marker layer is purely hit-driven — expected notes the user fails to hit don't get a red dot. See the future-feature note in `docs/progress.md`.
-- **Marker timing snaps to `currentStep`.** The first attempt at timestamp-based positioning desynced; see the desync trap entry in `docs/progress.md` before trying again.
+- **Marker timing.** Hit _grading_ now reads the audio clock (`nearestStepNow` projects `transport.seconds` onto the step grid → early/perfect/late), but marker _position_ still snaps to the step's notehead. The first attempt at timestamp-_positioning_ desynced; see the desync trap entry in `docs/progress.md` before moving the dots by microtiming. End-to-end MIDI timing still needs an e-kit to verify.
 - **No playback-timing tests.** Codec round-trip is covered; the `Tone.Part` dispatch path and the live marker watcher are not. Add when behavior justifies it.

@@ -246,6 +246,9 @@ watch(
 .play-stack {
   max-height: min(70vh, 720px);
   overflow-y: auto;
+  /* Contain dense rows (24ths/32nds) on narrow screens instead of letting the
+     grid blow out the panel width. */
+  overflow-x: auto;
   scroll-behavior: smooth;
 }
 .play-stack__measure + .play-stack__measure {

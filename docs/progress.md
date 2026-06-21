@@ -4,6 +4,55 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-06-21: Mobile playback pass, part 2 (Transport accordion, pause promoted, early/perfect/late feedback)
+
+**Status:** Landed the P1 items from the same feedback list. The mobile Transport now collapses its secondary toggles behind an "Options" disclosure; "pause between loops" moved out of the MIDI-practice settings into the Transport as a general player option; and MIDI hits on a correct pad are now graded early / perfect / late off the audio clock, with an on-screen verdict and a calibration readout. Verified the layout in Chrome (mobile + desktop); the MIDI-timing path needs an e-kit to exercise end-to-end (as with every prior MIDI feature).
+
+**Done:**
+
+- **Transport "Options" accordion (mobile).** `Transport.vue` keeps Play + BPM + tempo + swing always visible; the toggles (loop, pause, timer, metronome, count-in) collapse behind an `Options` button on mobile and show inline on `md+`. Implemented purely with responsive classes (`hidden md:flex` + a `md:hidden` toggle button); the toggles also reveal text labels (`md:hidden` spans) when expanded on mobile. Verified at 412px (collapsed → expands to two labeled rows) and 1280px (inline, no button).
+- **"Pause between loops" promoted to a general player option.** The silent review-window toggle (backed by `midi.practiceMode` + `practiceTimerSec`) moved from the Settings drawer's "MIDI practice" section into the Transport Options, with its own seconds input. It is no longer gated on the loop toggle being visible/on (it simply takes effect when a loop runs). The duplicate Settings section was removed. The between-loop countdown overlay already existed and is unchanged.
+- **Early / perfect / late timing feedback.** Replaced the live-marker grade `on-time` with `perfect` / `early` / `late` for hits on the correct pad. `usePlayback` captures the playing timeline and exposes `nearestStepNow()`, which reads `transport.seconds` (the audio clock) and returns the nearest step + a signed `deltaSec`. The midi store calls this via a `setHitTimingProvider` callback **synchronously inside the MIDI message handler** (before Vue's async flush advances the clock — the key fix vs. the old desync trap) and stamps `timing` onto the hit. `EditorView` grades `deltaMs = deltaSec*1000 - latencyMs` against a perfect window of `max(8, tolerance*0.4)`, drops a color-coded marker on the grid + staff (green/blue/orange), and flashes a short `PERFECT / EARLY / LATE ±N ms` badge.
+- **MIDI offset review + calibration aid.** The Settings drawer's MIDI tuning section gained a live "Last hit" readout (latency-compensated ms, color-coded) and a one-line instruction: play the chart and dial the latency offset until on-beat hits read near 0 ms. With grading now anchored to the audio clock, the latency slider finally means just the kit→browser delay (not the Tone lookahead it had to absorb before).
+
+**Decisions:**
+
+- **Accordion, not a drawer move (user choice).** The user picked the in-Transport accordion over relocating toggles into Settings, so the controls stay where the eye already is during play.
+- **Timing captured in the MIDI handler, graded in the view.** Geometry lives in `usePlayback` (single source); the store calls `nearestStepNow()` synchronously so the audio-clock read happens at hit time, then the view applies the user's latency/tolerance. This is the audio-clock approach the desync-trap note prescribed — and it grades timing without trying to _move_ the marker by microtiming (which is what desynced before).
+- **Right pad ⇒ always a timing grade.** A correct-voice hit reads early/perfect/late regardless of magnitude; only a wrong or unexpected pad reads wrong-voice/off-time. Clearer pedagogy than collapsing big misses into "off-time".
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), and `npm run build` all pass.
+
+**Caveat:** The early/perfect/late grade, the verdict badge, and the calibration readout only light up with a connected MIDI kit, which this environment doesn't have. The math is typecheck-clean and follows the audio-clock guidance, but the user should verify on the Aroma TDX 15S: steady on-beat hits should converge to "perfect" once the latency offset is dialed so "Last hit" reads ~0 ms; pushing/dragging should read early/late with sensible ms.
+
+**Next (open from the list):** none of the original feedback items remain. Possible follow-ups: missed-note markers (expected notes the player didn't hit), and per-loop history so bars can be compared over time.
+
+---
+
+## 2026-06-20: Mobile playback pass, part 1 (track-end reset, wake lock, centered auto-scroll)
+
+**Status:** Landed the three P0 items from the mobile-study feedback: a non-looping track now stops and resets instead of hanging in "playing", the screen stays awake while a groove plays, and the chart follows the playhead automatically (centered) instead of needing a manual scroll. Verified in Chrome at a 412px-wide (mobile) viewport, editor and embed.
+
+**Done:**
+
+- **Track end without loop now stops and resets (player-state bug).** With `loop` off, the `Tone.Part` had no event past the last step, so the transport ran on silently and the UI stayed stuck showing Stop. `usePlayback.play` now schedules an explicit `{ kind: 'end' }` event at `trackEnd` when `!g.loop`; its handler (via `Tone.getDraw`) calls `stop()` and a new `setOnEnded` callback. `EditorView` registers `setOnEnded` to clear markers (kept in practice mode, matching manual stop), stop the practice timer, and snap `selectedMeasure` back to 0 ("volta para o começo"). Verified: a 4-bar groove at 100 BPM auto-stopped at ~10 s, the Play button returned, and the Measure 1 tab re-selected.
+- **Screen Wake Lock during playback.** New `src/composables/useWakeLock.ts` wraps the Screen Wake Lock API. Both views drive it with `watch(isPlaying, v => v ? request() : release())`, so manual stop, natural end, and timer expiry all release it (they all flip `isPlaying`). The lock auto-releases when the page is hidden, so the composable re-acquires on `visibilitychange` if still wanted. No-ops (silently) where unsupported. Verified `navigator.wakeLock.request('screen')` resolves with no error in Chrome.
+- **Chart auto-scrolls with a centered playhead.** `renderScore` gained a `singleRow` option; `Score.vue` passes `singleRow: isPlaying`, so playback renders every measure on one horizontal row (paused keeps the readable multi-row wrap). A `watch(activeStep)` sets `hostRoot.scrollLeft` so the active step's marker stays at the horizontal center, clamped to `[0, scrollWidth - clientWidth]`. Instant (not smooth) scroll so it can't lag the beat. Manual scroll is left to the user when paused. Verified: playhead pinned at center while the chart slid behind it (the score-host scrollbar advanced between frames), editor and embed.
+- **Grid stack contains dense rows on mobile.** `.play-stack` got `overflow-x: auto` so 24th/32nd rows scroll inside the panel during playback instead of blowing out the panel width on a narrow screen.
+
+**Decisions:**
+
+- **`onEnded` is separate from `stop()`.** Manual stop snapshots the paused measure for resume; natural end resets to bar 0. Keeping them distinct avoids a flag and matches the two different user intents.
+- **Wake lock tied to `isPlaying`, not to play()/stop() call sites.** One watcher per view covers every stop path (manual, end, timer) without duplicating release calls.
+- **Single-row only while playing.** Wrapping is better for reading a static chart; a centered scroll is better for following a moving one. Switching on `isPlaying` gives each mode its best layout, at the cost of a re-render on play/pause (cheap).
+- **Instant scroll, not smooth.** At 16ths/120+ BPM a smooth-scroll animation never catches the next step; instant keeps the playhead genuinely centered. Steps that share a sustained note resolve to the same marker x, so the chart only jumps per note, not per empty step.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), and `npm run build` all pass.
+
+**Next (still open from the feedback list):** reorganize the Transport/Settings for mobile (it is congested); move "stop/pause between loops" out of the MIDI-practice section into a general chart/player config and stop gating it solely on loop; per-note early/late/perfect feedback; review the MIDI latency offset. The Transport reorg is a design decision (tabs vs accordion vs drawer) worth confirming before building.
+
+---
+
 ## 2026-06-19: Cleared the remaining bugs.md backlog (dense-division clip, active-measure follow)
 
 **Status:** Closed the last three `bugs.md` items: the 24ths-in-embed clip, the 16ths note past the barline, and following measures during playback.

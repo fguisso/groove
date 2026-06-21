@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore } from '@/stores/midi'
@@ -36,13 +36,31 @@ function availableWidth(): number {
 function redraw() {
   if (!host.value) return
   try {
-    const res = renderScore(host.value, groove.value, { width: availableWidth() })
+    const res = renderScore(host.value, groove.value, {
+      width: availableWidth(),
+      singleRow: props.isPlaying,
+    })
     stepMarkers.value = res.stepMarkers
     voiceY.value = res.voiceY
     measureBounds.value = res.measureBounds
   } catch (e) {
     console.warn('[score] render failed', e)
   }
+}
+
+// During playback keep the active step pinned to the horizontal center so the
+// player never has to scroll by hand: the playhead stays put and the chart
+// slides behind it. Snaps instantly (no smooth animation) so it can't lag the
+// beat at fast tempos. When paused, scrolling is left to the user.
+function scrollActiveIntoView() {
+  if (!props.isPlaying) return
+  const root = hostRoot.value
+  const m = marker.value
+  if (!root || !m) return
+  const center = m.x + m.width / 2
+  const target = center - root.clientWidth / 2
+  const max = root.scrollWidth - root.clientWidth
+  root.scrollLeft = Math.max(0, Math.min(target, max))
 }
 
 let ro: ResizeObserver | null = null
@@ -60,6 +78,22 @@ onBeforeUnmount(() => {
   ro?.disconnect()
 })
 watch(groove, redraw, { deep: true })
+
+// Re-render when entering/leaving playback so the staff switches between the
+// wrapped (paused, readable) and single-row (playing, scrollable) layouts.
+watch(
+  () => props.isPlaying,
+  () => {
+    redraw()
+    nextTick(scrollActiveIntoView)
+  },
+)
+
+// Follow the playhead while it moves.
+watch(
+  () => props.activeStep,
+  () => scrollActiveIntoView(),
+)
 
 const marker = computed(() => {
   const i = props.activeStep ?? -1
@@ -193,9 +227,17 @@ defineExpose({
   animation: score-marker-appear 220ms ease-out;
   z-index: 2;
 }
-.score-live-marker--on-time {
+.score-live-marker--perfect {
   background: hsl(160 70% 45% / 0.55);
   box-shadow: 0 0 14px hsl(160 70% 45% / 0.7);
+}
+.score-live-marker--early {
+  background: hsl(200 85% 58% / 0.55);
+  box-shadow: 0 0 14px hsl(200 85% 58% / 0.7);
+}
+.score-live-marker--late {
+  background: hsl(28 90% 56% / 0.55);
+  box-shadow: 0 0 14px hsl(28 90% 56% / 0.7);
 }
 .score-live-marker--wrong-voice {
   background: hsl(var(--warn) / 0.55);

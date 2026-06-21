@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Play, Square, Repeat, Timer, Waves } from 'lucide-vue-next'
+import { Play, Square, Repeat, Timer, Waves, Hourglass, SlidersHorizontal } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
+import { useMidiStore } from '@/stores/midi'
 import Slider from '@/components/ui/Slider.vue'
 import Switch from '@/components/ui/Switch.vue'
 import MetronomeIcon from '@/components/icons/MetronomeIcon.vue'
@@ -18,6 +19,12 @@ const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 const timerStore = usePracticeTimerStore()
 const { enabled: timerEnabled, minutes: timerMinutes } = storeToRefs(timerStore)
+const midi = useMidiStore()
+const { practiceMode, practiceTimerSec } = storeToRefs(midi)
+
+// Mobile collapses the secondary toggles behind an "Options" disclosure to keep
+// the transport short; desktop (md+) always shows them inline.
+const optionsOpen = ref(false)
 
 // Auto-disable the timer if the user turns loop off — without a loop the timer
 // has nothing useful to bound, and leaving it visually "on" would mislead.
@@ -37,10 +44,15 @@ function onMinutesInput(e: Event) {
   const v = Number((e.target as HTMLInputElement).value)
   timerStore.setMinutes(v)
 }
+
+function onPauseSecInput(e: Event) {
+  const v = Number((e.target as HTMLInputElement).value)
+  midi.setPracticeTimerSec(v)
+}
 </script>
 
 <template>
-  <section class="panel flex flex-wrap items-center gap-5 p-3" data-tour="transport">
+  <section class="panel flex flex-wrap items-center gap-x-5 gap-y-3 p-3" data-tour="transport">
     <button
       v-if="!props.isPlaying"
       type="button"
@@ -66,9 +78,9 @@ function onMinutesInput(e: Event) {
       <span class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">bpm</span>
     </div>
 
-    <div class="h-8 w-px bg-border" />
+    <div class="hidden sm:block h-8 w-px bg-border" />
 
-    <div class="flex items-center gap-2 min-w-[180px] flex-1">
+    <div class="flex items-center gap-2 min-w-[160px] flex-1">
       <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
         >Tempo</label
       >
@@ -81,7 +93,7 @@ function onMinutesInput(e: Event) {
       />
     </div>
 
-    <div v-if="!props.readOnly" class="flex items-center gap-2 min-w-[160px] flex-1">
+    <div v-if="!props.readOnly" class="flex items-center gap-2 min-w-[150px] flex-1">
       <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
         >Swing</label
       >
@@ -97,7 +109,22 @@ function onMinutesInput(e: Event) {
       >
     </div>
 
-    <div class="flex items-center gap-4 ml-auto" data-tour="playback-options">
+    <!-- Options disclosure — visible only on mobile, where space is tight. -->
+    <button
+      type="button"
+      class="md:hidden ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+      :aria-expanded="optionsOpen"
+      @click="optionsOpen = !optionsOpen"
+    >
+      <SlidersHorizontal class="h-3.5 w-3.5" />
+      Options
+    </button>
+
+    <div
+      class="basis-full md:basis-auto md:ml-auto flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-3 md:border-t-0 md:pt-0"
+      :class="optionsOpen ? 'flex' : 'hidden md:flex'"
+      data-tour="playback-options"
+    >
       <label
         v-if="!props.readOnly"
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
@@ -108,8 +135,38 @@ function onMinutesInput(e: Event) {
         "
       >
         <Repeat class="h-3.5 w-3.5" />
+        <span class="md:hidden">Loop</span>
         <Switch :model-value="groove.loop" @update:model-value="store.toggleLoop()" />
       </label>
+
+      <!-- Pause between loops: a silent review window before the loop repeats.
+           A general player option now (not buried in MIDI settings, not gated on
+           the loop toggle); it simply takes effect whenever a loop is running. -->
+      <label
+        class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
+        :title="
+          practiceMode
+            ? `Pause between loops: on (${practiceTimerSec}s review) — silent countdown before the loop repeats`
+            : 'Pause between loops: off — add a silent review gap before each loop repeats'
+        "
+      >
+        <Hourglass class="h-3.5 w-3.5" />
+        <span class="md:hidden">Pause</span>
+        <Switch :model-value="practiceMode" @update:model-value="midi.setPracticeMode($event)" />
+        <input
+          type="number"
+          min="1"
+          max="60"
+          step="1"
+          inputmode="numeric"
+          aria-label="Pause between loops, seconds"
+          class="w-10 px-1 py-0.5 text-[11px] font-mono tabular text-center bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary/60"
+          :value="practiceTimerSec"
+          @input="onPauseSecInput"
+        />
+        <span class="text-[10px] font-mono uppercase tracking-widest">s</span>
+      </label>
+
       <label
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
         :class="
@@ -126,6 +183,7 @@ function onMinutesInput(e: Event) {
         "
       >
         <Timer class="h-3.5 w-3.5" />
+        <span class="md:hidden">Timer</span>
         <Switch :model-value="timerEnabled" @update:model-value="onToggleTimer($event)" />
         <input
           type="number"
@@ -140,6 +198,7 @@ function onMinutesInput(e: Event) {
         />
         <span class="text-[10px] font-mono uppercase tracking-widest">min</span>
       </label>
+
       <label
         v-if="!props.readOnly"
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
@@ -150,8 +209,10 @@ function onMinutesInput(e: Event) {
         "
       >
         <MetronomeIcon class="h-3.5 w-3.5" />
+        <span class="md:hidden">Metro</span>
         <Switch :model-value="groove.metronome" @update:model-value="store.toggleMetronome()" />
       </label>
+
       <label
         v-if="!props.readOnly"
         class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground cursor-pointer"
@@ -162,6 +223,7 @@ function onMinutesInput(e: Event) {
         "
       >
         <Waves class="h-3.5 w-3.5" />
+        <span class="md:hidden">Count-in</span>
         <Switch :model-value="groove.countIn" @update:model-value="store.toggleCountIn()" />
       </label>
     </div>

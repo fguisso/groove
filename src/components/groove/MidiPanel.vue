@@ -15,8 +15,6 @@ const {
   lastHit,
   latencyMs,
   toleranceMs,
-  practiceMode,
-  practiceTimerSec,
   showToms,
   showCymbals,
 } = storeToRefs(midi)
@@ -29,6 +27,14 @@ defineEmits<{
 const lastHitVoiceLabel = computed(() =>
   lastHit.value ? VOICE_BY_ID[lastHit.value.voiceId].label : null,
 )
+
+// Latency-compensated timing of the most recent hit (negative = early, positive
+// = late). Dial the latency offset until steady hits read near 0 ms.
+const lastTimingMs = computed(() => {
+  const t = lastHit.value?.timing
+  if (!t) return null
+  return Math.round(t.deltaSec * 1000 - latencyMs.value)
+})
 </script>
 
 <template>
@@ -201,47 +207,38 @@ const lastHitVoiceLabel = computed(() =>
               @input="midi.setTolerance(Number(($event.target as HTMLInputElement).value))"
             />
           </label>
-        </div>
-      </section>
 
-      <!-- MIDI practice -->
-      <section class="space-y-2">
-        <h4 class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-          MIDI practice
-        </h4>
-        <label class="flex items-start gap-2 text-xs">
-          <input
-            type="checkbox"
-            :checked="practiceMode"
-            class="mt-0.5 accent-[hsl(var(--primary))]"
-            @change="midi.setPracticeMode(($event.target as HTMLInputElement).checked)"
-          />
-          <span class="leading-snug">
-            Pause between loops
-            <span class="block text-[11px] text-muted-foreground">
-              Holds the markers for review and silently counts down before the next bar.
-              <br />Pause keeps your markers; only Play clears them.
-            </span>
-          </span>
-        </label>
-        <div v-if="practiceMode" class="space-y-1 pl-6 text-xs">
-          <div class="flex items-baseline justify-between">
+          <!-- Calibration readout: dial the latency offset until steady hits
+               read near 0 ms (early < 0, late > 0). -->
+          <div
+            class="flex items-baseline justify-between rounded-md border bg-muted/20 px-2.5 py-1.5"
+          >
             <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              Review time
+              Last hit
             </span>
-            <span class="font-mono tabular text-[10px] text-muted-foreground">
-              {{ practiceTimerSec }} s
+            <span
+              class="font-mono tabular text-xs font-semibold"
+              :class="
+                lastTimingMs == null
+                  ? 'text-muted-foreground'
+                  : Math.abs(lastTimingMs) <= Math.max(8, toleranceMs * 0.4)
+                    ? 'text-[hsl(160_70%_45%)]'
+                    : lastTimingMs < 0
+                      ? 'text-[hsl(200_85%_58%)]'
+                      : 'text-[hsl(28_90%_56%)]'
+              "
+            >
+              {{
+                lastTimingMs == null ? '—' : (lastTimingMs > 0 ? '+' : '') + lastTimingMs + ' ms'
+              }}
             </span>
           </div>
-          <input
-            :value="practiceTimerSec"
-            type="range"
-            min="1"
-            max="30"
-            step="1"
-            class="w-full accent-[hsl(var(--primary))]"
-            @input="midi.setPracticeTimerSec(Number(($event.target as HTMLInputElement).value))"
-          />
+          <p class="text-[11px] leading-snug text-muted-foreground">
+            Play the chart and adjust the latency offset until your on-beat hits read near 0 ms.
+            <span class="text-[hsl(200_85%_58%)]">Blue</span> = early,
+            <span class="text-[hsl(160_70%_45%)]">green</span> = perfect,
+            <span class="text-[hsl(28_90%_56%)]">orange</span> = late.
+          </p>
         </div>
       </section>
 

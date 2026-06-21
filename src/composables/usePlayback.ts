@@ -175,6 +175,26 @@ export function usePlayback() {
   const practiceTimerVal = ref(0)
   const part = shallowRef<Tone.Part | null>(null)
   const players = shallowRef<Record<SynthKey, Trigger> | null>(null)
+  let onEnded: (() => void) | null = null
+
+  // Geometry of the currently-playing timeline, captured at play() time. Used to
+  // grade an incoming MIDI hit against the step grid using the audio clock (see
+  // nearestStepNow). Null while stopped.
+  interface Timeline {
+    stepSec: number
+    countInLen: number
+    n: number
+    loopLen: number
+    loop: boolean
+  }
+  let timeline: Timeline | null = null
+
+  // Fires once when a non-looping track reaches its end and tears itself down,
+  // so the view can reset the editor (back to the first bar) and drop the wake
+  // lock. Manual stop() does NOT call this — it has its own teardown path.
+  function setOnEnded(fn: (() => void) | null) {
+    onEnded = fn
+  }
 
   function ensurePlayers() {
     if (players.value) return players.value
@@ -236,6 +256,7 @@ export function usePlayback() {
       | { kind: 'count'; beat: number }
       | { kind: 'step'; step: number }
       | { kind: 'timer'; secLeft: number }
+      | { kind: 'end' }
     const events: [string, Ev][] = []
     if (g.countIn) {
       for (let i = 0; i < beatsPerMeasure; i++) {
@@ -247,6 +268,12 @@ export function usePlayback() {
     }
     for (let i = 0; i < pauseSec; i++) {
       events.push([trackEnd + i + '', { kind: 'timer', secLeft: pauseSec - i }])
+    }
+    // Without a loop the transport would keep running silently after the last
+    // step, leaving the UI stuck in "playing". Schedule an explicit end one
+    // step past the final note so we tear down and reset to the top.
+    if (!g.loop) {
+      events.push([trackEnd + '', { kind: 'end' }])
     }
 
     const newPart = new Tone.Part((time, ev: Ev) => {
@@ -265,6 +292,14 @@ export function usePlayback() {
           practiceTimerVal.value = ev.secLeft
           countInBeat.value = 0
           currentStep.value = -1
+        }, time)
+        return
+      }
+
+      if (ev.kind === 'end') {
+        Tone.getDraw().schedule(() => {
+          stop()
+          onEnded?.()
         }, time)
         return
       }
@@ -299,6 +334,7 @@ export function usePlayback() {
     newPart.loopEnd = trackEnd + pauseSec + 's'
     newPart.start(0)
     part.value = newPart
+    timeline = { stepSec, countInLen, n, loopLen: trackEnd + pauseSec, loop: g.loop }
 
     Tone.getTransport().stop()
     Tone.getTransport().position = 0
@@ -317,10 +353,27 @@ export function usePlayback() {
 
   function stop() {
     stopInternal()
+    timeline = null
     isPlaying.value = false
     currentStep.value = -1
     countInBeat.value = 0
     practiceTimerVal.value = 0
+  }
+
+  // Project the live transport position onto the step grid so a MIDI hit can be
+  // graded for timing. Reads the audio clock (`transport.seconds`) directly —
+  // it must be called synchronously from the MIDI handler, before Vue's async
+  // flush advances the clock. Returns null during count-in / the loop tail or
+  // when stopped. `deltaSec` is signed: negative = early, positive = late.
+  function nearestStepNow(): { step: number; deltaSec: number } | null {
+    if (!isPlaying.value || !timeline) return null
+    const tl = timeline
+    const ts = Tone.getTransport().seconds
+    const phase = tl.loop ? ((ts % tl.loopLen) + tl.loopLen) % tl.loopLen : ts
+    const rel = phase - tl.countInLen
+    const step = Math.round(rel / tl.stepSec)
+    if (step < 0 || step >= tl.n) return null
+    return { step, deltaSec: rel - step * tl.stepSec }
   }
 
   function updateRuntime(g: Groove) {
@@ -333,5 +386,15 @@ export function usePlayback() {
     if (!v) currentStep.value = -1
   })
 
-  return { isPlaying, currentStep, countInBeat, practiceTimerVal, play, stop, updateRuntime }
+  return {
+    isPlaying,
+    currentStep,
+    countInBeat,
+    practiceTimerVal,
+    play,
+    stop,
+    updateRuntime,
+    setOnEnded,
+    nearestStepNow,
+  }
 }

@@ -2,14 +2,22 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { voiceForMidiNote, type VoiceId } from '@/lib/voices'
 
+export interface HitTiming {
+  step: number
+  deltaSec: number // signed: negative = early, positive = late
+}
+
 export interface MidiHit {
   voiceId: VoiceId
   rawNote: number
   velocity: number
   atMs: number
+  // Step + timing delta captured against the audio clock at hit time. Null when
+  // not playing or during count-in / the loop tail.
+  timing: HitTiming | null
 }
 
-export type LiveMarkerGrade = 'on-time' | 'wrong-voice' | 'off-time'
+export type LiveMarkerGrade = 'perfect' | 'early' | 'late' | 'wrong-voice' | 'off-time'
 
 export interface LiveMarker {
   id: number
@@ -62,6 +70,14 @@ export const useMidiStore = defineStore('midi', () => {
   const deviceName = ref<string | null>(null)
   const lastHit = ref<MidiHit | null>(null)
   let cleanups: Array<() => void> = []
+
+  // Supplies the step + timing delta for an incoming hit, read straight off the
+  // audio clock. Registered by the editor (which owns the playback timeline) so
+  // the store stays decoupled from Tone. Called synchronously in onMessage.
+  let hitTimingProvider: (() => HitTiming | null) | null = null
+  function setHitTimingProvider(fn: (() => HitTiming | null) | null) {
+    hitTimingProvider = fn
+  }
 
   const latencyMs = ref(readNumber(LATENCY_KEY, 0))
   const toleranceMs = ref(readNumber(TOLERANCE_KEY, 40))
@@ -166,6 +182,7 @@ export const useMidiStore = defineStore('midi', () => {
       rawNote: note,
       velocity: velocity / 127,
       atMs: performance.now(),
+      timing: hitTimingProvider ? hitTimingProvider() : null,
     }
   }
 
@@ -189,6 +206,7 @@ export const useMidiStore = defineStore('midi', () => {
     setPracticeTimerSec,
     setShowToms,
     setShowCymbals,
+    setHitTimingProvider,
     openPanel,
     closePanel,
     togglePanel,

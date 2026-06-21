@@ -255,9 +255,17 @@
     pointer-events: none;
     animation: live-marker-appear 220ms ease-out;
   }
-  .led-cell.live-marker-on-time::after {
+  .led-cell.live-marker-perfect::after {
     background: hsl(160 70% 45%);
     box-shadow: 0 0 8px hsl(160 70% 45% / 0.85);
+  }
+  .led-cell.live-marker-early::after {
+    background: hsl(200 85% 58%);
+    box-shadow: 0 0 8px hsl(200 85% 58% / 0.85);
+  }
+  .led-cell.live-marker-late::after {
+    background: hsl(28 90% 56%);
+    box-shadow: 0 0 8px hsl(28 90% 56% / 0.85);
   }
   .led-cell.live-marker-wrong-voice::after {
     background: hsl(var(--warn));
