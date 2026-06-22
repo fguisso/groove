@@ -1,3 +1,10 @@
+<!--
+  Groove, a drum-groove editor.
+  Copyright (C) 2026 Fernando Guisso
+  This program is free software under the GNU General Public License,
+  version 3 or (at your option) any later version. See the LICENSE file.
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'

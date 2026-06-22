@@ -138,3 +138,21 @@ Code, bug reports, and feedback are all welcome.
 A note before you open a PR: I do not have a strong formal music background, and I expect other contributors here to often be curious programmers in the same boat. If you are proposing a feature rooted in music theory or drum notation conventions, please explain the concept in your PR description. Write as if the reader is a capable programmer but not a music teacher, and teach us what you are adding. The same for programmers, explain to musician what you are doing.
 
 Let us treat this build as an excuse to learn together.
+
+## License
+
+Groove is free software, licensed under the **[GNU GPL v3.0 or later](./LICENSE)** (`GPL-3.0-or-later`).
+Copyright (C) 2026 Fernando Guisso.
+
+The legally binding text is [`LICENSE`](./LICENSE), in English. There is also a plain-language
+summary in Portuguese at [`LICENCA.pt-BR.md`](./LICENCA.pt-BR.md).
+
+In practice:
+
+- **Embedding via `<iframe>`** (for example, on a study site) is free and does **not** require you
+  to adopt the GPL: the iframe loads a separate application and does not create a derivative work.
+- Copyleft only reaches those who **modify, redistribute, or bundle Groove's source code**; in that
+  case, the changes must also be GPL-3.0, with the corresponding source made available.
+
+Adopting the GPL here is also a nod to the Brazilian free software community. To learn more, in
+Portuguese, check out [PotiLivre, the Potiguar Free Software Community](https://potilivre.org/).
