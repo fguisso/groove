@@ -10,6 +10,11 @@ export type VoiceId = 'hh' | 'sn' | 'kk' | 't1' | 't2' | 't3' | 'ride'
 export type VoiceKind = 'hat' | 'note'
 export type VoiceGroup = 'tom' | 'cymbal'
 
+// What the state bar can paint. A brush names a musical intent; each voice maps
+// it to whichever of its own states means that, or to nothing when the voice
+// has no such state (a snare has no "open", a hi-hat has no "ghost").
+export type BrushState = 'normal' | 'accent' | 'ghost' | 'open' | 'pedal'
+
 export interface VoiceState {
   // index 0 in `Voice.states` is "off" — empty object.
   // Active states declare:
@@ -20,6 +25,7 @@ export interface VoiceState {
   articulation?: string // VexFlow articulation type, e.g. 'a>' for accent
   annotation?: string // VexFlow annotation text, e.g. 'o' for open hat
   synthKey?: string // overrides the voice's default synth key
+  brush?: BrushState // which state-bar brush paints this state
 }
 
 export interface Voice {
@@ -43,10 +49,17 @@ export const VOICES: readonly Voice[] = [
     defaultSynthKey: 'hh',
     states: [
       {},
-      { midi: 42, velocity: 0.8, symbol: 'x' },
-      { midi: 46, velocity: 0.9, symbol: 'o', annotation: 'o', synthKey: 'hho' },
-      { midi: 42, velocity: 1, symbol: 'X', articulation: 'a>' },
-      { midi: 44, velocity: 0.9, symbol: 'f', vexKey: 'f/4/x2', synthKey: 'hhp' },
+      { midi: 42, velocity: 0.8, symbol: 'x', brush: 'normal' },
+      { midi: 46, velocity: 0.9, symbol: 'o', annotation: 'o', synthKey: 'hho', brush: 'open' },
+      { midi: 42, velocity: 1, symbol: 'X', articulation: 'a>', brush: 'accent' },
+      {
+        midi: 44,
+        velocity: 0.9,
+        symbol: 'f',
+        vexKey: 'f/4/x2',
+        synthKey: 'hhp',
+        brush: 'pedal',
+      },
     ],
   },
   {
@@ -58,9 +71,9 @@ export const VOICES: readonly Voice[] = [
     defaultSynthKey: 'sn',
     states: [
       {},
-      { midi: 38, velocity: 0.85, symbol: '●' },
-      { midi: 38, velocity: 1, symbol: '◆', articulation: 'a>' },
-      { midi: 38, velocity: 0.35, symbol: '○', annotation: '(·)' },
+      { midi: 38, velocity: 0.85, symbol: '●', brush: 'normal' },
+      { midi: 38, velocity: 1, symbol: '◆', articulation: 'a>', brush: 'accent' },
+      { midi: 38, velocity: 0.35, symbol: '○', annotation: '(·)', brush: 'ghost' },
     ],
   },
   {
@@ -72,9 +85,9 @@ export const VOICES: readonly Voice[] = [
     defaultSynthKey: 'kk',
     states: [
       {},
-      { midi: 36, velocity: 0.9, symbol: '●' },
-      { midi: 36, velocity: 1, symbol: '◆', articulation: 'a>' },
-      { midi: 36, velocity: 0.55, symbol: '○' },
+      { midi: 36, velocity: 0.9, symbol: '●', brush: 'normal' },
+      { midi: 36, velocity: 1, symbol: '◆', articulation: 'a>', brush: 'accent' },
+      { midi: 36, velocity: 0.55, symbol: '○', brush: 'ghost' },
     ],
   },
   {
@@ -87,9 +100,9 @@ export const VOICES: readonly Voice[] = [
     group: 'tom',
     states: [
       {},
-      { midi: 50, velocity: 0.85, symbol: '●' },
-      { midi: 50, velocity: 1, symbol: '◆', articulation: 'a>' },
-      { midi: 50, velocity: 0.45, symbol: '○' },
+      { midi: 50, velocity: 0.85, symbol: '●', brush: 'normal' },
+      { midi: 50, velocity: 1, symbol: '◆', articulation: 'a>', brush: 'accent' },
+      { midi: 50, velocity: 0.45, symbol: '○', brush: 'ghost' },
     ],
   },
   {
@@ -102,9 +115,9 @@ export const VOICES: readonly Voice[] = [
     group: 'tom',
     states: [
       {},
-      { midi: 47, velocity: 0.85, symbol: '●' },
-      { midi: 47, velocity: 1, symbol: '◆', articulation: 'a>' },
-      { midi: 47, velocity: 0.45, symbol: '○' },
+      { midi: 47, velocity: 0.85, symbol: '●', brush: 'normal' },
+      { midi: 47, velocity: 1, symbol: '◆', articulation: 'a>', brush: 'accent' },
+      { midi: 47, velocity: 0.45, symbol: '○', brush: 'ghost' },
     ],
   },
   {
@@ -117,9 +130,9 @@ export const VOICES: readonly Voice[] = [
     group: 'tom',
     states: [
       {},
-      { midi: 41, velocity: 0.85, symbol: '●' },
-      { midi: 41, velocity: 1, symbol: '◆', articulation: 'a>' },
-      { midi: 41, velocity: 0.45, symbol: '○' },
+      { midi: 41, velocity: 0.85, symbol: '●', brush: 'normal' },
+      { midi: 41, velocity: 1, symbol: '◆', articulation: 'a>', brush: 'accent' },
+      { midi: 41, velocity: 0.45, symbol: '○', brush: 'ghost' },
     ],
   },
   {
@@ -132,9 +145,9 @@ export const VOICES: readonly Voice[] = [
     group: 'cymbal',
     states: [
       {},
-      { midi: 51, velocity: 0.8, symbol: 'x' },
-      { midi: 51, velocity: 1, symbol: 'X', articulation: 'a>' },
-      { midi: 51, velocity: 0.5, symbol: 'x' },
+      { midi: 51, velocity: 0.8, symbol: 'x', brush: 'normal' },
+      { midi: 51, velocity: 1, symbol: 'X', articulation: 'a>', brush: 'accent' },
+      { midi: 51, velocity: 0.5, symbol: 'x', brush: 'ghost' },
     ],
   },
 ]
@@ -148,6 +161,27 @@ export const VOICE_BY_ID: Record<VoiceId, Voice> = Object.fromEntries(
 export function nextState(voiceId: VoiceId, current: number): number {
   const v = VOICE_BY_ID[voiceId]
   return (current + 1) % v.states.length
+}
+
+// The state bar's palette, in the order it is shown. Symbols are the snare /
+// kick glyphs, which read as the generic case; a hi-hat renders its own.
+export const BRUSHES: readonly { id: BrushState; label: string; symbol: string }[] = [
+  { id: 'normal', label: 'Normal', symbol: '●' },
+  { id: 'accent', label: 'Accent', symbol: '◆' },
+  { id: 'ghost', label: 'Ghost', symbol: '○' },
+  { id: 'open', label: 'Open', symbol: 'o' },
+  { id: 'pedal', label: 'Pedal', symbol: 'f' },
+]
+
+// Which of this voice's states the brush paints, or null when the voice has no
+// equivalent (asking a snare for "open" is not an error, it is a no-op).
+export function stateForBrush(voiceId: VoiceId, brush: BrushState): number | null {
+  const i = VOICE_BY_ID[voiceId].states.findIndex((s) => s.brush === brush)
+  return i < 0 ? null : i
+}
+
+export function voicesForBrush(brush: BrushState): VoiceId[] {
+  return VOICE_IDS.filter((id) => stateForBrush(id, brush) !== null)
 }
 
 export function effectiveSynthKey(voiceId: VoiceId, state: number): string | null {

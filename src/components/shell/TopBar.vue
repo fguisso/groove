@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { Github, Share2, Trash2, Settings, HelpCircle } from 'lucide-vue-next'
+import { Github, Share2, Trash2, Settings, HelpCircle, GraduationCap } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import GrooveLogo from '@/components/shell/GrooveLogo.vue'
@@ -17,7 +17,7 @@ const { startTour } = useTour()
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 const midi = useMidiStore()
-const { connected: midiConnected } = storeToRefs(midi)
+const { connected: midiConnected, lessonMode } = storeToRefs(midi)
 
 function onClear() {
   const hasAny =
@@ -41,7 +41,7 @@ function onClear() {
       <span
         class="hidden sm:inline text-[10px] font-mono uppercase tracking-widest text-muted-foreground border border-border rounded px-1.5 py-0.5"
       >
-        v0.1
+        v0.2
       </span>
     </a>
 
@@ -65,7 +65,7 @@ function onClear() {
         href="https://github.com/fguisso/groove"
         target="_blank"
         rel="noopener"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        class="touch-target inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         title="View source on GitHub"
         aria-label="View source on GitHub"
       >
@@ -73,13 +73,33 @@ function onClear() {
       </a>
       <button
         type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        class="touch-target inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         title="Take the guided tour"
         aria-label="Take the guided tour"
         data-tour="help"
         @click="startTour"
       >
         <HelpCircle class="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        class="touch-target inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+        :class="
+          lessonMode
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+        "
+        :title="
+          lessonMode
+            ? 'Lesson mode is on: grid and brush only. Click to bring back the staff and the practice tools.'
+            : 'Lesson mode: hide the staff and the practice tools, leaving the grid, the brush and Play'
+        "
+        aria-label="Toggle lesson mode"
+        :aria-pressed="lessonMode"
+        data-tour="lesson"
+        @click="midi.setLessonMode(!lessonMode)"
+      >
+        <GraduationCap class="h-3.5 w-3.5" />
       </button>
       <Button
         variant="ghost"

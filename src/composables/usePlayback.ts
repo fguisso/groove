@@ -1,4 +1,4 @@
-import { ref, shallowRef, watch } from 'vue'
+import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import * as Tone from 'tone'
 import type { Groove } from '@/lib/model'
 import { VOICES, effectiveSynthKey } from '@/lib/voices'
@@ -173,6 +173,12 @@ export function usePlayback() {
   const currentStep = ref(-1)
   const countInBeat = ref(0)
   const practiceTimerVal = ref(0)
+  // Completed passes through the track since play() started. Speed training
+  // watches this to decide when to nudge the tempo.
+  const loopCount = ref(0)
+  // True when Play ran but the audio context refused to start. Surfaced so the
+  // user is told "there is no sound" instead of watching a silent playhead.
+  const audioBlocked = ref(false)
   const part = shallowRef<Tone.Part | null>(null)
   const players = shallowRef<Record<SynthKey, Trigger> | null>(null)
   let onEnded: (() => void) | null = null
@@ -228,10 +234,150 @@ export function usePlayback() {
     }
   }
 
+  // Backgrounding Safari kills audio, and not always recoverably. iOS suspends
+  // the AudioContext, and WebKit has a third state beyond running/suspended,
+  // `interrupted`, which a plain resume() outside a user gesture will not lift.
+  // Once a context is stuck there it stays dead for the rest of the page's life:
+  // the transport keeps counting, the UI keeps saying "playing", and nothing
+  // sounds. So: try the cheap fixes first, and if the context is still not
+  // running, throw it away and build a new one.
+  function audioState(): string {
+    // WebKit reports a fourth state, `interrupted`, that the DOM typings do not
+    // know about. Read it as a plain string rather than lying to the compiler.
+    return Tone.getContext().state as string
+  }
+
+  function audioRunning(): boolean {
+    return audioState() === 'running'
+  }
+
+  type RawContext = AudioContext & { resume?: () => Promise<void>; close?: () => Promise<void> }
+
+  function rawContext(): RawContext | null {
+    try {
+      return Tone.getContext().rawContext as unknown as RawContext
+    } catch {
+      return null
+    }
+  }
+
+  // Playing a one-sample silent buffer is the gesture iOS actually accepts as
+  // "the user asked for audio". resume() alone is not always enough, especially
+  // for a context coming back from `interrupted`.
+  function pokeSilentBuffer(ctx: RawContext) {
+    try {
+      const buf = ctx.createBuffer(1, 1, 22050)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.connect(ctx.destination)
+      src.start(0)
+    } catch {
+      // Context already gone; the caller will swap it.
+    }
+  }
+
+  // Swap in a brand new context, dropping the synths that belonged to the old
+  // one. Must run synchronously inside a gesture: constructing an AudioContext
+  // outside one gives you a context that starts suspended and stays there.
+  function swapContext() {
+    const old = rawContext()
+    try {
+      part.value?.dispose()
+    } catch {
+      // Belonged to the dead context; nothing to salvage.
+    }
+    part.value = null
+    players.value = null
+    timeline = null
+    try {
+      const fresh = new Tone.Context({ latencyHint: 'interactive' })
+      Tone.setContext(fresh)
+      const raw = fresh.rawContext as unknown as RawContext
+      void raw.resume?.()
+      pokeSilentBuffer(raw)
+    } catch {
+      return
+    }
+    // Safari caps how many contexts a page may hold, so the corpse has to go or
+    // a few backgrounding cycles would exhaust the budget.
+    void old?.close?.().catch(() => {})
+  }
+
+  /**
+   * Everything that must happen in the SAME TASK as the user's gesture.
+   *
+   * This is the whole fix: iOS only honours audio unlocking synchronously
+   * inside the handler. The previous attempt did its repair work after
+   * `await Tone.start()`, by which point the activation is spent, so a context
+   * stuck in `interrupted` stayed stuck and the app was silent for good.
+   * Call this first, before any await, then let play() do the async parts.
+   */
+  function unlockAudioSync() {
+    const state = audioState()
+    if (state === 'running') return
+    if (state === 'closed') {
+      swapContext()
+      return
+    }
+    const ctx = rawContext()
+    if (!ctx) return
+    void ctx.resume?.()
+    pokeSilentBuffer(ctx)
+  }
+
+  async function resumeAudio(): Promise<boolean> {
+    if (audioRunning()) return true
+    try {
+      await Tone.getContext().resume()
+    } catch {
+      // Needs a gesture, or the context is interrupted. Fall through.
+    }
+    if (audioRunning()) return true
+    try {
+      await rawContext()?.resume?.()
+    } catch {
+      // Nothing more to try without rebuilding.
+    }
+    return audioRunning()
+  }
+
+  function onVisibility() {
+    if (document.visibilityState !== 'visible') return
+    void resumeAudio().then((ok) => {
+      // Coming back to a dead context while the UI still says "playing" is the
+      // worst state to leave the user in: Stop looks like the only control and
+      // pressing it does not fix anything. Tear playback down so the Play
+      // button comes back, and let the next press rebuild the audio.
+      if (!ok && isPlaying.value) stop()
+    })
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibility)
+    onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility))
+  }
+
+  let lastStepDrawn = -1
+
   async function play(g: Groove, opts: PlayOptions = {}) {
+    // FIRST, and before any await: the gesture's activation dies the moment we
+    // yield, and iOS will not unlock audio afterwards.
+    unlockAudioSync()
+
     await Tone.start()
+    if (!(await resumeAudio())) {
+      // The context is beyond reviving. We have already spent the gesture, so
+      // this swap is a long shot, but a fresh context at least leaves the app
+      // in a state the next Play press can unlock.
+      swapContext()
+      await Tone.start()
+      await resumeAudio()
+    }
+    audioBlocked.value = !audioRunning()
     const p = ensurePlayers()
     stopInternal()
+    loopCount.value = 0
+    lastStepDrawn = -1
     Tone.getTransport().bpm.value = g.tempo
     applySwing(g)
 
@@ -324,6 +470,10 @@ export function usePlayback() {
       }
 
       Tone.getDraw().schedule(() => {
+        // Wrapping back to step 0 having already played past it means the Part
+        // restarted, which is one completed loop.
+        if (step === 0 && lastStepDrawn > 0) loopCount.value++
+        lastStepDrawn = step
         countInBeat.value = 0
         practiceTimerVal.value = 0
         currentStep.value = step
@@ -391,10 +541,14 @@ export function usePlayback() {
     currentStep,
     countInBeat,
     practiceTimerVal,
+    loopCount,
     play,
     stop,
     updateRuntime,
     setOnEnded,
     nearestStepNow,
+    resumeAudio,
+    audioBlocked,
+    audioState,
   }
 }

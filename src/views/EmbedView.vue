@@ -12,6 +12,7 @@ import { storeToRefs } from 'pinia'
 import { ExternalLink } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
+import { useSpeedTrainerStore } from '@/stores/speedTrainer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
 import { useWakeLock } from '@/composables/useWakeLock'
@@ -22,6 +23,7 @@ import PracticeClock from '@/components/groove/PracticeClock.vue'
 const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 const practiceTimer = usePracticeTimerStore()
+const speed = useSpeedTrainerStore()
 const route = useRoute()
 
 // Read-only when ?ro=1 appears in the hash's query part
@@ -35,8 +37,19 @@ const editorUrl = computed(() => {
 
 useUrlSync({ writeBack: false })
 
-const { isPlaying, currentStep, countInBeat, play, stop, setOnEnded } = usePlayback()
+const { isPlaying, currentStep, countInBeat, loopCount, play, stop, updateRuntime, setOnEnded } =
+  usePlayback()
 const wakeLock = useWakeLock()
+
+// Same speed-training rule as the editor; the embed is a practice surface too.
+watch(loopCount, (n) => {
+  const next = speed.tempoAfterLoops(n, groove.value.tempo)
+  if (next !== null) store.setTempo(next)
+})
+watch(
+  () => [groove.value.tempo, groove.value.swing],
+  () => updateRuntime(groove.value),
+)
 
 watch(isPlaying, (playing) => {
   if (playing) wakeLock.request()

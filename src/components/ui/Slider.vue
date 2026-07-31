@@ -92,4 +92,21 @@ const pct = computed(() => {
     0 0 0 2px hsl(var(--background)),
     0 0 10px -2px hsl(var(--primary) / 0.6);
 }
+
+/* A 14px thumb is fine under a mouse and impossible under a thumb. The track
+   keeps its 4px look; only the grab handle and the row height grow. */
+@media (pointer: coarse) {
+  .groove-slider {
+    height: 28px;
+  }
+  .groove-slider::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -10px;
+  }
+  .groove-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+  }
+}
 </style>

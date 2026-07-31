@@ -4,6 +4,362 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-07-30: iPad round two, and v0.2
+
+**Status:** Shipped as v0.2. The user drove the iPad again and reported two things: the audio fix
+did not work, and Options was still a mess on a phone. Both addressed.
+
+**The audio fix did not work, and I know why the first attempt failed.** It did its repair work
+after `await Tone.start()`. iOS only honours audio unlocking in the **same task** as the user's
+gesture, and an `await` hands the task back, so by the time the old code tried to rebuild the
+context the activation was already spent. A context stuck in WebKit's `interrupted` state stayed
+stuck. What is there now:
+
+- `unlockAudioSync()` runs as the very first statement of `play()`, before any await: it resumes
+  the raw context without awaiting and plays a one-sample silent buffer, which is the poke iOS
+  actually accepts as "the user asked for audio".
+- `swapContext()` closes the dead context (Safari caps how many a page may hold, so a few
+  background cycles would otherwise exhaust the budget) and installs a fresh one, dropping the
+  synths that belonged to the corpse.
+- If it still will not start, `audioBlocked` flips and the hint banner says so in plain words,
+  with the context's own state string and a Reload button, rather than leaving the user watching a
+  silent playhead.
+
+**Options rebuilt for phones.** It was five multi-input toggles sharing one wrapping flex row,
+which read as a pile of loose numbers. Below `md` each option is now its own row: icon and name
+left, controls right, hairline between. Speed gets two rows because its controls are a sentence.
+Three separate bugs surfaced while fixing it:
+
+- Opening Options could reveal it underneath the 180px sticky brush bar. Now the panel scrolls
+  itself clear via `scroll-margin-bottom`. The first attempt computed the offset by hand and
+  silently did nothing: the panel had just gone from `display: none` to `flex`, and the browser
+  was still holding a zero-sized box, so a `void el.offsetHeight` reflow is needed before the
+  `scrollIntoView` call.
+- The number spinners were eating about 15px per field and clipping "140" to "14". Removed: a
+  spinner is unhittable with a thumb anyway.
+- The Speed row overflowed its own panel by six pixels, which pushed "s" and "min" flush against
+  the edge. Tightened the letter-spacing and the control gap.
+
+**Deliberately deferred, at the user's call:** mirroring controls into the bottom corners on iPad
+landscape (2.1), and the Settings drawer covering the grid in landscape (severity 2 in the
+triage). Neither is started.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (32 tests), `npm run build`.
+
+**Caveat, unchanged and important:** the audio rebuild still cannot be verified anywhere but on the
+device. It only triggers on a WebKit `interrupted` context, which desktop Chrome never produces.
+If it fails again, the banner now reports the context state, which is the diagnostic the next
+attempt will need.
+
+---
+
+## 2026-07-30: First real-device feedback, plus Phase 3 (presets, paging, PWA, lesson mode)
+
+**Status:** The user drove the editor on an iPad and came back with one hard bug and four UX
+complaints. All fixed, then Phase 3 landed except 3.5, which is deliberately left alone.
+
+**Bug: Safari killed audio permanently after backgrounding.** Reported as "saí para segundo plano,
+voltei, não tocou, e apertando play de novo não tocava mais". The old `resumeAudio` assumed the
+context could only be `suspended`, but WebKit has a third state, `interrupted`, that a plain
+`resume()` outside a user gesture will not lift. Once stuck there the context stays dead for the
+rest of the page's life: the transport keeps counting, the UI keeps saying "playing", nothing
+sounds. Now: `resumeAudio` returns whether it succeeded and tries the Tone wrapper and the raw
+context in turn; if it still fails, `play()` (which runs inside a gesture, the only moment a fresh
+context may start) throws the context away and rebuilds it, dropping the synths with it. And
+`visibilitychange` tears playback down when the resume fails, so the user is never left staring at
+a Stop button that fixes nothing.
+
+**Fixed from the same session:**
+
+- **A Scroll brush, the user's own idea and better than mine.** Painting owns the horizontal axis,
+  which left no way to drag the grid sideways. Rather than guess at gesture direction, there is now
+  an explicit non-brush in the bar: pick Scroll and the cells hand `touch-action` back to the
+  browser. They stay lit and normal-looking, because dimming the whole grid just to scroll it would
+  be absurd.
+- **Brush labels always show.** They were hidden below 480px, leaving a row of bare glyphs with no
+  way to learn what they meant: a tooltip needs a hover and a finger has none. Below 520px the
+  button stacks instead, glyph over word. Seven 44px buttons plus 6px gaps overflowed a 390px
+  screen by a hair and wrapped Scroll onto its own row, so the gap drops to 4px there and the whole
+  palette fits one line. Bar height went 233px to 181px.
+- **The Options button was landing in the middle of the transport panel.** It had `ml-auto` inside
+  a wrapping flex row, so it settled wherever the sliders happened to break. The sliders are now
+  `basis-full` below `md`, which puts Loop and Options together on the first row.
+- **Speed training was invisible in the tour.** It was one clause in a list of six practice tools.
+  It now has its own step, anchored to the transport (its actual control lives inside the Options
+  group, which is `display: none` on a phone). Tour at v5.
+- **The audio hint said "iPhone" on an iPad.** iPads have not had a side switch for years; theirs
+  is the bell in Control Centre. The copy now branches on the device.
+
+**Phase 3:**
+
+- **3.2 Presets.** `src/lib/presets.ts` declares patterns in beat offsets rather than cells, so one
+  definition covers every division. `applyPreset` fills the selected measure only and returns how
+  many notes the current division was too coarse to hold, which the picker surfaces instead of
+  silently dropping them. Basic rock, 8ths hats, 16ths hats, four-on-the-floor. One history entry,
+  so a wrong preset costs one undo. **The benchmark task is now 2 interactions**: open the menu,
+  pick the groove.
+- **3.3 Paging arrows** flanking the numbered measure tabs, not replacing them. The strip was
+  already hidden during playback.
+- **3.4 PWA.** Manifest with `display: standalone`, icons rendered from the logo via headless
+  Chrome (192, 512, maskable 512, plus an `apple-touch-icon`, because iOS ignores the manifest's
+  icons), iOS standalone meta tags. No service worker: installable, not offline.
+- **3.1 Lesson mode.** A cap toggle in the top bar hides the staff, the transport panel and the
+  division row, leaving the grid, the brush bar and Play. The bottom bar's transport row, normally
+  phone-only, shows at every width there because it is the only transport left. Holds the wake lock
+  even while stopped, since the scenario is standing at the kit transcribing between takes.
+- **3.5 Dynamics sub-mode: not built, on purpose.** Vertical drag currently belongs to page
+  scrolling, and taking it would undo the axis split that makes painting work at all. Worth doing
+  only as an explicit sub-mode, and only once the brush has been used in anger.
+
+**Decisions:**
+
+- **Scroll is a brush, not a mode toggle elsewhere.** It sits in the same row as the paint brushes
+  because it answers the same question, "what does my finger do right now", and one control
+  answering that question is easier than two.
+- **Presets replace the measure rather than merging into it.** Merging makes the result depend on
+  what was already there, which is the opposite of what a preset is for.
+- **Presets are beat-based.** A cell-based table would need one entry per division and would drift.
+  Declaring "hi-hat on 0, 0.5, 1, ..." is division-agnostic and makes the lossy case explicit.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (32 tests, 6 new for presets),
+`npm run build`.
+
+**Verified in Chrome:** the preset menu fills basic rock correctly and one undo takes the whole
+thing back; the Scroll brush sets `touch-action: auto`, leaves cells enabled, and a tap paints
+nothing; paging arrows move the selection and disable at the ends; lesson mode hides the staff,
+transport panel and division row while keeping the grid, the bar and a visible Play; the manifest
+and both icon sizes serve 200; the mobile bar is three rows at 390px with every label readable.
+
+**Caveat:** the audio rebuild is the one fix that cannot be verified here at all. It only triggers
+on a WebKit `interrupted` context, which Chrome on a desktop never produces. It needs the exact
+sequence the user hit: play, background Safari, come back.
+
+**Next:** the real-device pass. Everything from Phase 1 through 3 has been checked in a simulated
+viewport and almost nothing on hardware.
+
+---
+
+## 2026-07-30: Mobile usability, Phase 2.3 + 2.4 + 2.5 (thumb-zone transport, Loop button, speed training)
+
+**Status:** Phase 2 is complete. Nothing in Phase 1 or 2 has been exercised on a real phone or
+tablet yet, which is the next thing that should happen.
+
+**Done:**
+
+- **2.3 Transport in the thumb zone.** On a phone the bottom bar grew a first row: Play/Stop, the
+  tempo with -5/+5 nudge buttons, and undo/redo. The transport panel drops its own Play button and
+  BPM readout below `md`, so there is no duplicate control, and it keeps Loop, the tempo/swing
+  sliders and the Options accordion. The bar renders during playback too (transport row only, the
+  brush row hides), so Stop is always where Play was.
+- **2.4 Loop as a labelled button.** Out of the Options accordion, always visible, icon plus the
+  word "Loop", filled primary when on. The label is most of the target.
+- **2.5 Speed training.** New `speedTrainer` store: add N BPM every M loops until a target, in
+  absolute BPM. `usePlayback` now exposes `loopCount`, incremented when the drawn step wraps back
+  to 0 having played past it. Both views watch it and call `setTempo`. Settings live in the
+  Transport's Options row next to the other practice tools, persisted to `localStorage`.
+- **Tour bumped to v4.** The "Hear it" step was anchored to the Play button, which is now
+  `hidden` on a phone, so driver.js would have spotlighted an invisible element (the same trap the
+  v2 note records for `playback-options`). It is merged into the transport step, which is always
+  visible, and that step now mentions speed training. Ten steps instead of eleven.
+
+**Decisions:**
+
+- **The tempo reached by speed training is kept when playback stops.** "I got it to 140" is the
+  point of the exercise, and the slider is right there to wind it back. The alternative, snapping
+  back to the starting tempo, would throw away the result the drummer just earned.
+- **Absolute BPM, not a percentage.** It matches the transport readout and the unit a drummer
+  thinks in, which is what the plan asked for.
+- **`loopCount` is derived from the drawn step wrapping, not from a scheduled loop event.** A
+  `Tone.Part` event sitting exactly on `loopEnd` is not reliably fired, and the wrap is already
+  observable inside the draw callback that updates `currentStep`.
+- **The embed gets speed training too,** and with it the `updateRuntime` watcher it was missing, so
+  a tempo change now takes effect mid-playback there as well as in the editor.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (26 tests, 5 new for the speed trainer),
+`npm run build`.
+
+**Caveat:** speed training could not be exercised end to end here, because `loopCount` increments
+inside `Tone.getDraw()`, which never fires while this browser window reports `visibilityState:
+hidden`. The arithmetic is unit-tested and the wiring is a one-line watcher, but the actual tempo
+climb needs a real device. Same for the mobile bar layout: the 390 px check narrows `#app` and
+rewrites the media queries by hand, which is a good proxy and not the real thing.
+
+**Next:** a real session on a phone and an iPad. After that, Phase 3 in whatever order the session
+suggests, and the observed-user pass the spec still owes.
+
+---
+
+## 2026-07-30: Mobile usability, Phase 2.1 + 2.2 (state bar, brush mode, drag-to-paint, undo)
+
+**Status:** Cycle-on-tap is gone. A sticky state bar holds the brush, the grid applies it, a drag
+paints a run, and undo/redo takes back a whole stroke. Benchmark measured before and after: the
+"one bar of basic rock" task went from **13 interactions to 6**, under the plan's target of 8.
+
+**Measured first, as the plan asked.** `tests/interaction-cost.spec.ts` derives the cost from the
+real interaction model rather than estimating it: 12 taps on the default 16ths grid, 13 at 8ths
+including the division change (the plan's ~14-16 guess was high), 16 once the snare is ghosted.
+The finding worth keeping: **drag only collapses adjacent cells.** Eighths on a sixteenths grid are
+alternating cells, so there is no run to drag and the brush ties cycling at 12. "Eight taps become
+one gesture" needs the division to match the pattern. The brush's unconditional win is non-default
+states: a ghosted snare drops 16 to 14 because you pick "ghost" once instead of tapping through it.
+
+**Done:**
+
+- **Brush semantics live in the voice registry.** Each `VoiceState` may declare `brush: 'normal' |
+'accent' | 'ghost' | 'open' | 'pedal'`; `stateForBrush(voice, brush)` inverts it. A snare has no
+  "open" and a hi-hat no "ghost", so the lookup returns null and the lane goes inert rather than
+  painting something wrong. Adding a voice still means editing one file.
+- **`StateBar.vue`,** `sticky bottom-0` with a blurred card background and the bottom safe-area
+  inset. Five state brushes, an eraser, sticking R/L/B, and undo/redo. The active brush is
+  deliberately loud (filled primary, glow) because the user has to know what is in their hand
+  without stopping to think. Labels hide below 480 px, leaving glyph-only 44 px buttons.
+- **Painting in `GrooveGrid`.** pointerdown opens a stroke and paints the origin cell; pointermove
+  resolves the cell under the pointer with `elementFromPoint` and repeats the stroke's value;
+  pointerup closes it. Restricted to the origin lane. Cells carry `data-cell` / `data-voice` /
+  `data-step` so the resolution is a `closest()` lookup, not element refs threaded through the grid.
+- **Undo/redo in the store.** A capped stack of 60 JSON snapshots. Every note-mutating action
+  pushes its own; `beginStroke` / `endStroke` suspend pushing so a twenty-cell drag is one undo
+  step. Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z are wired in `EditorView` alongside Space.
+- **Tour bumped to v3** with a new "Pick before you paint" step, and the "Build the beat" step
+  rewritten (it was teaching an interaction that no longer exists). The grid legend was rewritten
+  for the same reason.
+
+**Bugs found and fixed while verifying:**
+
+- **A fast drag skipped cells.** pointermove is sampled, not continuous: a flick across sixteen
+  cells reported only four of them, painting a dotted line. The stroke now interpolates from the
+  last painted step to the current one, so a fast drag paints the same run as a slow one. Found by
+  driving a real drag in Chrome, not by reading the code.
+- **Undo left the first cell of a stroke behind.** The origin cell was painted before the stroke
+  opened, so it landed in its own history entry and one undo removed everything except it.
+  `beginStroke` now runs first.
+- **Pre-existing: the guided tour re-showed on every visit.** `driver.js` 1.4 does not fire
+  `onDestroyed` when the popover is dismissed with the ×, so `groove:tourSeen` was never written.
+  Verified by closing on both an element-less and an element-anchored step. `maybeAutoStart` now
+  marks seen at start, which is the right meaning anyway: we showed it. `onDestroyed` stays wired
+  for manual replays.
+
+**Decisions:**
+
+- **The brush replaces cycling outright, not as a mode.** A mode toggle would protect the old
+  workflow at the cost of making the new one undiscoverable, and the plan is explicit that the
+  point is to stop cycling. With "normal" selected a tap is a plain on/off toggle, which is what
+  most editing is; the eraser and a visible undo make mistakes cheap.
+- **One brush, and the half of the grid it cannot reach goes inert.** A sticking brush over a note
+  lane, or "open" over a snare, dims the lane to 30% and disables the button. A tap that silently
+  does nothing is worse than a tap that visibly cannot happen. Picking a sticking brush also
+  reveals the sticking row, which would otherwise be hidden.
+- **Axis split via `touch-action: pan-y` on the cells.** The browser keeps vertical panning, the
+  app owns the horizontal axis, which is exactly the rule the plan describes and it needs no
+  gesture-direction heuristic. The cost is real and worth watching: the grid no longer flick-scrolls
+  sideways over the cells, only over the lane labels and the measure header. If that reads badly on
+  a phone, pagination (spec 3.3) is the escalation the plan already names.
+- **Keyboard cells still work.** The paint runs on pointerdown, so `@click` would double-fire; the
+  click handler only acts when `event.detail === 0`, which is how a keyboard-generated click
+  identifies itself.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (21 tests, 12 of them new), `npm run build`.
+
+**Verified in Chrome** by dispatching real pointer event sequences (the extension's synthetic drag
+does not reach this window reliably): a sparse 4-sample drag paints all 16 cells; one undo clears
+the whole stroke and redo restores it; dragging back over a filled run erases it; the ghost brush
+writes `○` on the snare and makes the hi-hat inert; the open brush leaves only the hi-hat live;
+picking R reveals the sticking row and dims every note lane. The full benchmark ran end to end in
+the UI at 6 interactions with the correct groove on the staff. Touch layout checked by forcing the
+`(pointer: coarse)` blocks on: every brush button is 44 px tall, the bar wraps to three rows at
+390 px.
+
+**Caveat:** the 390 px check narrows `#app`, not the viewport, so viewport-width media queries do
+not fire. On a real phone the brush labels hide below 480 px and the bar should be about two rows,
+not three. Worth confirming on device. Playback still cannot be driven here (`visibilityState` is
+permanently `hidden`, so `Tone.getDraw()` never fires).
+
+**Next:** 2.3 (transport in the thumb zone), 2.4 (labelled Loop button), 2.5 (speed training). And
+the observed-user pass the spec still owes: these numbers are counted, not watched.
+
+---
+
+## 2026-07-30: Mobile usability, Phase 1 (touch targets, stable viewport, iOS audio, scroll affordances)
+
+**Status:** Wrote `docs/specs/mobile-usability.md` (the whole three-phase plan, its severity triage
+and its benchmark) and landed all of Phase 1. Phase 2 (the sticky state bar plus brush mode, which
+is the real fix for cycle-on-tap) is specced but not started.
+
+**Done:**
+
+- **1.1 Touch targets and touch hygiene.** Everything a finger hits now clears 44 px on coarse
+  pointers. `touch-action: manipulation` on `button / a / input / select / textarea / [role=switch]`
+  kills the double-tap-zoom wait, which is what made cell taps feel laggy. New `.touch-target`
+  class (a no-op under a mouse, `min-height/min-width: 44px` under a finger) applied to `Button.vue`,
+  the TopBar icon buttons, the Transport's Options button and its number inputs. `.led-cell` gets
+  `min-height: 44px` (min-height beats the `h-9` utility, so the desktop cell is untouched). Measure
+  tabs go 28 to 44 px; the slider thumb goes 14 to 24 px.
+- **Grid columns moved from an inline `gridTemplateColumns` string to a `.note-grid` class** driven
+  by `--steps` / `--cell-min` / `--lane-label-w`. That is what lets the coarse-pointer floor be a
+  media query instead of JS: 48 px per column and a 72 px label column on touch, 26 px / 96 px
+  under a mouse. The `ml-5` / `ml-8` beat-marker margins became `.cell-gap` / `.cell-gap-lg` and
+  shrink to 4 / 8 px on touch, because that margin eats into the cell's own width.
+- **1.2 Stable viewport.** `min-h-screen` on the editor shell became `.app-shell`, which sets
+  `min-height: 100vh` then `100svh` (small viewport: constant while Safari's address bar collapses,
+  so the layout stops jumping mid-scroll) plus `padding-bottom: env(safe-area-inset-bottom)`. The
+  play stack's `max-height` got the same `vh` then `svh` treatment. The embed root deliberately does
+  not get `.app-shell`, because an embed must never claim a viewport height.
+- **1.3 Reliable audio on iOS.** `usePlayback` gained `resumeAudio()` and a `visibilitychange`
+  listener that calls it whenever the page comes back to the foreground (iOS suspends the
+  AudioContext in the background and does not resume it, so a groove came back silent with the
+  transport still "running"). `play()` awaits it right after `Tone.start()`. New `AudioHint.vue`:
+  a dismissible one-liner, shown once per browser on the first Play on an iOS device, saying the
+  iPhone side switch mutes web audio. There is no API to detect that switch, so saying it once is
+  the only honest fix. Editor only: a `position: fixed` banner inside an embed iframe would fight
+  whatever height the host page gave the frame.
+- **1.5 Horizontal scroll affordances.** The grid scroller got `-webkit-overflow-scrolling: touch`
+  and `overscroll-behavior-x: contain` (a horizontal flick stays in the grid instead of triggering
+  the browser back-swipe). Gradient edges fade in on whichever side has more content, driven by a
+  scroll listener plus a `ResizeObserver` on both the scroller and its content. And the grid now
+  follows the playhead horizontally: `activeStep` centers its column via
+  `getBoundingClientRect` deltas, instantly, mirroring what `Score.vue` already does for the staff.
+
+**Decisions:**
+
+- **`(pointer: coarse)`, not a width breakpoint.** The problem is finger-versus-mouse, not screen
+  size. A width query would shrink an iPad's targets in landscape and grow a narrow desktop
+  window's for no reason.
+- **44 px, not the 48 the plan asked for.** Columns are 48 px wide so a beat-start cell still
+  clears 44 after its 4 px marker gap, and every cell is 44 px tall. Going to a full 48x48 would
+  push a 16-step bar to roughly 970 px on a 390 px screen. At 48 px columns it is already 916 px,
+  about 2.6 screens per bar, which is the number to watch: if that reads as too much scrolling in
+  real use, pagination (spec item 3.3) moves ahead of the brush.
+- **Switches get an invisible hitbox, not a redesign.** `button[role=switch]::before` with
+  `inset: -14px -6px` buys the tap area without changing layout or overlapping the number input
+  6 px to its right. Phase 2.3 rebuilds those rows anyway.
+- **Removed `scroll-behavior: smooth` from `.play-stack`.** The vertical measure follow passes
+  `behavior: 'smooth'` explicitly, so it is unaffected; the new horizontal follow sets `scrollLeft`
+  directly and has to land instantly or it lags the beat.
+- **Cells carry `data-step`.** The horizontal follow needs the active column's element and the
+  seven lanes all share a step index, so `querySelector('[data-step=N]')` returning the first match
+  is exactly right. Cheaper than threading element refs through the grid.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (9 tests), and `npm run build` all pass.
+
+**Verified in Chrome:** the desktop layout is pixel-identical to before (96 px label column, 4 px
+gap, 36 px cells). The touch layout was checked by rewriting every `(pointer: coarse)` block's
+`conditionText` to `all` via CSSOM, since desktop Chrome will never match the query: cells come out
+48x44, measure tabs 44x44, every `.touch-target` at least 44 px tall, label column 72 px. With the
+app constrained to 390 px the bar overflows (916 px content in a 356 px scroller), the right edge
+gradient shows on load and the left one appears after scrolling. The `data-step` centering math was
+replayed against the live DOM and lands the target column at offset 0.
+
+**Caveat:** the browser window in this environment reports `visibilityState: hidden`, so
+`Tone.getDraw()` never fires and playback could not be driven end to end. The horizontal
+follow-playhead was verified as geometry plus wiring, not against a running transport. The iOS
+pieces (silent-switch hint, context resume on foreground) need a real iPhone. Worth checking on
+device: hit Play, background the app, come back, confirm sound resumes.
+
+**Next:** measure the benchmark from the spec ("one bar of basic rock", expected ~14-16
+interactions today) before building anything else, then 2.1 and 2.2 together.
+
+---
+
 ## 2026-06-21: Mobile playback pass, part 2 (Transport accordion, pause promoted, early/perfect/late feedback)
 
 **Status:** Landed the P1 items from the same feedback list. The mobile Transport now collapses its secondary toggles behind an "Options" disclosure; "pause between loops" moved out of the MIDI-practice settings into the Transport as a general player option; and MIDI hits on a correct pad are now graded early / perfect / late off the audio clock, with an on-screen verdict and a calibration readout. Verified the layout in Chrome (mobile + desktop); the MIDI-timing path needs an e-kit to exercise end-to-end (as with every prior MIDI feature).

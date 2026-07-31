@@ -15,8 +15,11 @@ const props = defineProps<{
   label?: string
   liveHit?: boolean
   liveMarker?: LiveMarkerGrade
+  // The active brush cannot paint this lane (a sticking brush over a note lane,
+  // or "open" over a snare). Dimmed and non-interactive so a tap that would do
+  // nothing never looks like it should have worked.
+  inertLane?: boolean
 }>()
-const emit = defineEmits<{ (e: 'click'): void }>()
 
 const symbol = computed(() => {
   if (props.kind === 'sticking') return props.label ?? ''
@@ -59,21 +62,22 @@ const liveMarkerClass = computed(() => {
 <template>
   <button
     type="button"
+    :disabled="inertLane"
     :class="
       cn(
         'led-cell h-9 w-full select-none text-[11px] font-mono font-semibold',
         'flex items-center justify-center',
         beat && 'beat',
-        beatStart && !downbeat && 'ml-5',
-        beatStart && downbeat && 'ml-8',
+        beatStart && !downbeat && 'cell-gap',
+        beatStart && downbeat && 'cell-gap-lg',
         filled && 'filled',
         filled && accent && 'accent',
         active && 'active-step',
         liveHit && 'live-hit',
+        inertLane && 'inert-lane',
         liveMarkerClass,
       )
     "
-    @click="emit('click')"
   >
     <span>{{ symbol }}</span>
   </button>

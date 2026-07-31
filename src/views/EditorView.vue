@@ -11,6 +11,7 @@ import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore, type LiveMarkerGrade } from '@/stores/midi'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
+import { useSpeedTrainerStore } from '@/stores/speedTrainer'
 import { useUrlSync } from '@/composables/useUrlSync'
 import { usePlayback } from '@/composables/usePlayback'
 import { useWakeLock } from '@/composables/useWakeLock'
@@ -22,7 +23,9 @@ import ShareDialog from '@/components/shell/ShareDialog.vue'
 import GrooveGrid from '@/components/groove/GrooveGrid.vue'
 import Score from '@/components/groove/Score.vue'
 import Transport from '@/components/groove/Transport.vue'
+import StateBar from '@/components/groove/StateBar.vue'
 import PracticeClock from '@/components/groove/PracticeClock.vue'
+import AudioHint from '@/components/groove/AudioHint.vue'
 import MidiPanel from '@/components/groove/MidiPanel.vue'
 import Select from '@/components/ui/Select.vue'
 import { exportMidi } from '@/lib/export-midi'
@@ -32,6 +35,7 @@ const store = useGrooveStore()
 const { groove } = storeToRefs(store)
 const midi = useMidiStore()
 const practiceTimer = usePracticeTimerStore()
+const speed = useSpeedTrainerStore()
 const { maybeAutoStart } = useTour()
 useUrlSync()
 
@@ -40,11 +44,14 @@ const {
   currentStep,
   countInBeat,
   practiceTimerVal,
+  loopCount,
   play,
   stop,
   updateRuntime,
   setOnEnded,
   nearestStepNow,
+  audioBlocked,
+  audioState,
 } = usePlayback()
 const wakeLock = useWakeLock()
 watch(
@@ -54,9 +61,24 @@ watch(
 
 // Keep the screen awake while a groove is playing; release the moment it stops
 // (manual stop, natural end, or timer expiry all flip isPlaying to false).
-watch(isPlaying, (playing) => {
-  if (playing) wakeLock.request()
-  else wakeLock.release()
+// Lesson mode holds the lock even when stopped: you are standing at the kit
+// transcribing a bar between takes, and the screen dimming mid-thought is
+// exactly the failure this is here to prevent.
+watch(
+  [isPlaying, () => midi.lessonMode],
+  ([playing, lesson]) => {
+    if (playing || lesson) wakeLock.request()
+    else wakeLock.release()
+  },
+  { immediate: true },
+)
+
+// Speed training: every N completed loops, nudge the tempo toward the target.
+// The tempo it reaches is kept when playback stops, because "I got it to 140"
+// is the point of the exercise; the slider is right there to wind it back.
+watch(loopCount, (n) => {
+  const next = speed.tempoAfterLoops(n, groove.value.tempo)
+  if (next !== null) store.setTempo(next)
 })
 
 // Brief on-screen verdict for the most recent hit on a correct pad (early /
@@ -142,11 +164,19 @@ function onStop() {
   stop()
 }
 
-// Single global shortcut: Space toggles play/pause.
+// Global shortcuts: Space toggles play/pause, Cmd/Ctrl+Z undoes.
 function onKeydown(e: KeyboardEvent) {
-  if (e.code !== 'Space') return
   const t = e.target as HTMLElement | null
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+  const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+  if (typing) return
+
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault()
+    if (e.shiftKey) store.redo()
+    else store.undo()
+    return
+  }
+  if (e.code !== 'Space') return
   e.preventDefault()
   if (isPlaying.value) onStop()
   else onPlay()
@@ -187,11 +217,11 @@ async function onExportPng() {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="app-shell flex flex-col">
     <TopBar @share="shareOpen = true" />
 
     <main class="flex-1 px-4 py-5 space-y-4 max-w-[1200px] w-full mx-auto">
-      <div class="flex flex-wrap items-center gap-4 text-sm">
+      <div v-if="!midi.lessonMode" class="flex flex-wrap items-center gap-4 text-sm">
         <div class="flex items-center gap-2" data-tour="division">
           <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
             >Division</label
@@ -212,17 +242,25 @@ async function onExportPng() {
         </div>
       </div>
 
-      <div class="relative" data-tour="score">
+      <!-- Lesson mode: standing at a kit with a teacher talking. The staff and
+           the practice tools are for studying afterwards, not for catching a
+           bar as it is dictated, so they step aside and the grid gets the room. -->
+      <div v-if="!midi.lessonMode" class="relative" data-tour="score">
         <Score ref="scoreRef" :active-step="currentStep" :is-playing="isPlaying" />
         <PracticeClock />
       </div>
-      <Transport :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
+      <Transport v-if="!midi.lessonMode" :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
       <GrooveGrid :active-step="currentStep" :is-playing="isPlaying" />
+      <StateBar :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
     </main>
 
     <MidiPanel @export-midi="onExportMidi" @export-png="onExportPng" />
 
     <ShareDialog v-model:open="shareOpen" />
+
+    <!-- Editor only: a position:fixed banner inside an embed iframe would fight
+         whatever height the host page gave the frame. -->
+    <AudioHint :is-playing="isPlaying" :blocked="audioBlocked" :state="audioState()" />
 
     <Transition name="count-fade">
       <div

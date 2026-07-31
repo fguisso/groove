@@ -98,6 +98,18 @@
   #app {
     height: 100%;
   }
+
+  /* Interactive elements opt out of the browser's double-tap-to-zoom gesture.
+     Without this every tap on a grid cell waits ~300ms to find out whether a
+     second tap is coming, which reads as lag when building a beat by hand. */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role='switch'] {
+    touch-action: manipulation;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family:
@@ -144,6 +156,10 @@
     padding: 1rem 0.5rem;
     overflow-x: auto;
   }
+  .score-host {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
   .score-host svg {
     max-width: 100%;
     height: auto;
@@ -165,6 +181,83 @@
 }
 
 @layer components {
+  /* Page shell. `svh` is the *small* viewport height: it stays constant while
+     Safari's address bar collapses and expands, so the layout never jumps
+     mid-scroll the way `vh` does. `vh` first as the fallback. */
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100svh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Anything a finger has to hit. Visual size is left to the element; this only
+     guarantees the box a thumb can land on. Apple HIG asks 44pt, Material 48dp
+     — 44px plus the surrounding gutter lands the touch pitch at 48. */
+  .touch-target {
+    touch-action: manipulation;
+  }
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Switches are deliberately tiny (28x16). Rather than redesign them, hang an
+     invisible hitbox off the pseudo-element so the finger target clears 44px
+     without changing layout or nudging the neighbouring number inputs. */
+  @media (pointer: coarse) {
+    button[role='switch'] {
+      position: relative;
+    }
+    button[role='switch']::before {
+      content: '';
+      position: absolute;
+      inset: -14px -6px;
+    }
+  }
+
+  /* The note grid: one label column, then one column per step. Both the cell
+     floor and the label width widen on touch devices; the cost is horizontal
+     scrolling, which 1.5 (edge fades + follow-playhead) is there to absorb. */
+  .note-grid {
+    display: grid;
+    gap: 4px;
+    grid-template-columns:
+      var(--lane-label-w, 96px)
+      repeat(var(--steps), minmax(var(--cell-min, 26px), 1fr));
+  }
+  @media (pointer: coarse) {
+    .note-grid {
+      /* 48px so a beat-start cell still clears 44 after its 4px marker gap. */
+      --cell-min: 48px;
+      --lane-label-w: 72px;
+    }
+  }
+
+  /* Gradient hints on a horizontal scroller: without them a phone user has no
+     way to know the bar continues past the right edge. */
+  .scroll-shell {
+    position: relative;
+  }
+  .scroll-edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28px;
+    pointer-events: none;
+    z-index: 3;
+    transition: opacity 120ms ease-out;
+  }
+  .scroll-edge--left {
+    left: 0;
+    background: linear-gradient(to right, hsl(var(--card)), transparent);
+  }
+  .scroll-edge--right {
+    right: 0;
+    background: linear-gradient(to left, hsl(var(--card)), transparent);
+  }
+
   .panel {
     @apply rounded-lg border bg-card text-card-foreground;
     box-shadow:
@@ -189,8 +282,51 @@
     background: hsl(var(--muted));
     border-color: hsl(var(--border));
   }
-  .led-cell:hover {
+  .led-cell:hover:not(:disabled) {
     border-color: hsl(var(--primary) / 0.6);
+  }
+  /* Cells own the horizontal axis so a drag across them paints; the browser
+     keeps the vertical one so the page still scrolls under a finger. The cost
+     is that the grid no longer flick-scrolls sideways over the cells — use the
+     lane labels or the measure header, which keep `touch-action: auto`. */
+  .led-cell {
+    touch-action: pan-y;
+  }
+  /* Scroll brush: give the horizontal axis back to the browser so a finger can
+     drag the grid sideways. Without this there is no way to reach step 24 of a
+     32nds bar on a phone, because every horizontal drag is a paint stroke. */
+  .is-panning .led-cell {
+    touch-action: auto;
+    cursor: grab;
+  }
+  .is-panning .led-cell:active {
+    cursor: grabbing;
+  }
+  .led-cell.inert-lane {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  /* Whitespace that marks where each beat (and each bar) starts. It is a left
+     margin, so it eats into the cell's own width — on touch devices it shrinks
+     to a token gap and the column floor grows to compensate. */
+  .led-cell.cell-gap {
+    margin-left: 1.25rem;
+  }
+  .led-cell.cell-gap-lg {
+    margin-left: 2rem;
+  }
+  /* min-height wins over the utility `h-9`, so the cell grows only where a
+     finger is the input device. */
+  @media (pointer: coarse) {
+    .led-cell {
+      min-height: 44px;
+    }
+    .led-cell.cell-gap {
+      margin-left: 4px;
+    }
+    .led-cell.cell-gap-lg {
+      margin-left: 8px;
+    }
   }
   .led-cell.beat {
     background: hsl(var(--beat-stripe));

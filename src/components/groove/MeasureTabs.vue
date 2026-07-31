@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Plus } from 'lucide-vue-next'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
 
 const MAX_MEASURES = 8
@@ -11,6 +11,8 @@ const { groove, selectedMeasure } = storeToRefs(store)
 
 const tabs = computed(() => Array.from({ length: groove.value.measures }, (_, i) => i))
 const canAdd = computed(() => groove.value.measures < MAX_MEASURES)
+const canPrev = computed(() => selectedMeasure.value > 0)
+const canNext = computed(() => selectedMeasure.value < groove.value.measures - 1)
 
 function addMeasure() {
   if (!canAdd.value) return
@@ -18,13 +20,32 @@ function addMeasure() {
   store.setMeasures(next)
   store.setSelectedMeasure(next - 1)
 }
+
+function step(delta: number) {
+  store.setSelectedMeasure(selectedMeasure.value + delta)
+}
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-1.5">
-    <span class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground pr-2">
+    <span
+      class="hidden sm:inline text-[10px] font-mono uppercase tracking-widest text-muted-foreground pr-2"
+    >
       Measures
     </span>
+
+    <!-- Paging arrows. Numbered tabs are fine with a mouse and fiddly with a
+         thumb, especially once eight of them wrap onto two rows. -->
+    <button
+      type="button"
+      class="measure-tab measure-tab--page"
+      :disabled="!canPrev"
+      aria-label="Previous measure"
+      title="Previous measure"
+      @click="step(-1)"
+    >
+      <ChevronLeft class="h-4 w-4" :stroke-width="2.5" />
+    </button>
     <button
       v-for="m in tabs"
       :key="m"
@@ -35,6 +56,17 @@ function addMeasure() {
     >
       {{ m + 1 }}
     </button>
+    <button
+      type="button"
+      class="measure-tab measure-tab--page"
+      :disabled="!canNext"
+      aria-label="Next measure"
+      title="Next measure"
+      @click="step(1)"
+    >
+      <ChevronRight class="h-4 w-4" :stroke-width="2.5" />
+    </button>
+
     <button
       type="button"
       class="measure-tab measure-tab--add"
@@ -81,8 +113,19 @@ function addMeasure() {
 .measure-tab--add {
   color: hsl(var(--muted-foreground));
 }
-.measure-tab--add:disabled {
-  opacity: 0.4;
+.measure-tab--add:disabled,
+.measure-tab--page:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
+}
+.measure-tab--page {
+  color: hsl(var(--foreground));
+}
+@media (pointer: coarse) {
+  .measure-tab {
+    min-width: 44px;
+    height: 44px;
+    font-size: 13px;
+  }
 }
 </style>

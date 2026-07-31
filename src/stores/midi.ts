@@ -33,6 +33,7 @@ const PRACTICE_MODE_KEY = 'groove:midiPracticeMode'
 const PRACTICE_SEC_KEY = 'groove:midiPracticeSec'
 const SHOW_TOMS_KEY = 'groove:showToms'
 const SHOW_CYMBALS_KEY = 'groove:showCymbals'
+const LESSON_KEY = 'groove:lessonMode'
 
 function readNumber(key: string, fallback: number): number {
   if (typeof localStorage === 'undefined') return fallback
@@ -85,6 +86,10 @@ export const useMidiStore = defineStore('midi', () => {
   const practiceTimerSec = ref(readNumber(PRACTICE_SEC_KEY, 10))
   const showToms = ref(readBool(SHOW_TOMS_KEY, true))
   const showCymbals = ref(readBool(SHOW_CYMBALS_KEY, true))
+  // Lesson mode: standing up, teacher talking, attention on the board. Strips
+  // the editor down to the grid, the brush and Play; everything analytical
+  // (staff, MIDI feedback, practice metrics) gets out of the way.
+  const lessonMode = ref(readBool(LESSON_KEY, false))
 
   function setLatency(v: number) {
     latencyMs.value = v
@@ -109,6 +114,10 @@ export const useMidiStore = defineStore('midi', () => {
   function setShowCymbals(v: boolean) {
     showCymbals.value = v
     writeBool(SHOW_CYMBALS_KEY, v)
+  }
+  function setLessonMode(v: boolean) {
+    lessonMode.value = v
+    writeBool(LESSON_KEY, v)
   }
 
   // Live markers — feedback dots dropped onto the grid and tablature for each
@@ -199,6 +208,8 @@ export const useMidiStore = defineStore('midi', () => {
     practiceTimerSec,
     showToms,
     showCymbals,
+    lessonMode,
+    setLessonMode,
     markers,
     setLatency,
     setTolerance,
