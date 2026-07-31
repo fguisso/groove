@@ -8,7 +8,7 @@ Snapshot of the current state. Update this when modules move, the data flow shif
 
 - `voices.ts` — voice registry. Single source of truth for what drums exist, their cell width, MIDI mapping per state, VexFlow render hints, synth dispatch keys, an optional `group: 'tom' | 'cymbal'` for the editor's bulk-collapse toggles, and an optional `brush` naming which state-bar brush paints that state (`stateForBrush` / `voicesForBrush` invert it; a snare has no "open", so the brush is a no-op there rather than an error). Includes `voiceForMidiNote()` for MIDI input mapping (registry states + `INPUT_ONLY_MIDI` for kit-side notes like snare rim).
 - `model.ts` — `Groove` shape; `Voices` type guarantees `hh`/`sn`/`kk` are present; toms and ride are optional. Uses `voices.ts` for cycle helpers.
-- `codec.ts` — bit-packed binary, base64url-encoded for the URL fragment. v4 is registry-driven (presence bitmap over `VOICES` order, then cells in order). v3 stays read-only for legacy URLs (maps `t4`→`t3`, `cy`→`ride`).
+- `codec.ts` — bit-packed binary, base64url-encoded for the URL fragment. v4 is registry-driven (presence bitmap over `VOICES` order, then cells in order). The bitmap is one byte and the registry now holds 8 voices, so it is full: a ninth voice needs a format bump, and `VOICES` order is append-only because the bitmap is positional. v3 stays read-only for legacy URLs (maps `t4`→`t3`, `cy`→`ride`).
 - `vex-builder.ts` — turns a `Groove` into a VexFlow staff by iterating the registry. Beam grouping is hardcoded for simple meters (1/4 beat group); 6/8 falls back to straight 8ths. `renderScore(..., { singleRow })` lays every measure on one horizontal row (used during playback so the chart can scroll behind a centered playhead); paused, it wraps measures onto rows for readability.
 - `presets.ts` — groove presets. Patterns are declared in beat offsets, not cells, so one definition applies at any division; `applyPreset` renders them into cell arrays for a single measure and reports how many notes the division was too coarse to hold.
 - `export-midi.ts` — `exportMidi(g)` writes a GM drum track (channel 10) via `@tonejs/midi`, looking up notes/velocities from the registry.
@@ -89,6 +89,7 @@ Source of truth: `src/lib/voices.ts`. Keep this table in sync if voices change.
 | `t2`     | 4 (off, normal, accent, ghost)       | 2    | yes          | mid tom               |
 | `t3`     | 4 (off, normal, accent, ghost)       | 2    | yes          | floor tom             |
 | `ride`   | 4 (off, normal, accent, ghost)       | 2    | yes          | ride cymbal           |
+| `crash`  | 3 (off, normal, accent)              | 2    | yes          | crash cymbal          |
 | sticking | 4 (-, R, L, B)                       | 2    | yes          | per step, not a voice |
 
 ## Known limitations

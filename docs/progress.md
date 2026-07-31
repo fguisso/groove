@@ -4,6 +4,57 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-07-30: Crash lane
+
+**Status:** `crash` is a first-class voice. Eighth and last slot of the v4 presence bitmap.
+
+**Why a lane and not a state of the ride.** The question that started this was how GrooveScribe
+does it, since the editor borrowed its shape. GrooveScribe has no crash lane: it has one
+polymorphic cymbal row (labelled "hi-hat") whose every cell picks an instrument, encoded as one
+character in the `H=` string (`x` normal, `X` accent, `o` open, `+` close, `c` crash, `r` ride,
+`b` ride bell, `m` cow bell, `s` stacker), each rendering at its own ABC pitch (`^c'` crash,
+`^A'` ride, `^B'` ride bell). One row, one state per cell, so a crash on beat 1 **replaces** the
+hi-hat on beat 1. That is the option `docs/specs/toms-and-ride.md` already weighed and rejected in
+Phase 2, and the reason stands: crash plus hi-hat on the same eighth is ordinary, and a model that
+cannot spell it is wrong for the common case. Kept our lane-per-voice model; borrowed only their
+two good conventions, crash above the hi-hat on the staff and the GM notes.
+
+**Done:**
+
+- `src/lib/voices.ts` — `crash` appended to `VOICES`: GM 49, `group: 'cymbal'`, vexKey `a/5/x2`.
+  Three states, off / normal / accent. No ghost: a ghosted crash is not a thing, and leaving the
+  fourth 2-bit slot empty costs nothing.
+- Input mapping reshuffled now that a crash voice exists: 49 comes from the registry, 57 (crash 2),
+  52 (china) and 55 (splash) fold into `crash` in `INPUT_ONLY_MIDI` instead of landing on the ride.
+- `usePlayback.ts` — `crash` synth: bright attack burst (noise → highpass 8k, 120ms) over a long
+  wash (noise → highpass 3.2k, 1.6s decay). No bell partial, which is what separates it from the
+  ride by ear.
+- `vex-builder.ts` — `VOICE_LINE.crash = -1`. Verified in the browser against the rendered SVG:
+  staff lines at y 219..259, crash notehead at 209 with its ledger line drawn, hi-hat at 214.
+  VexFlow displaces the crash horizontally when it shares a step with the hi-hat, since they are a
+  second apart. That is correct engraving, not a bug.
+- `GrooveGrid.vue` — lane order `hh, crash, ride, t1, t2, t3, sn, kk`. Hi-hat stays the anchor top
+  lane and the cymbals sit together, same reasoning as grouping the toms in Phase 2. Both hide
+  under the existing "Show cymbals" toggle for free, via `group: 'cymbal'`.
+- Tests: `tests/voices.spec.ts` (MIDI input mapping per cymbal, the no-ghost-on-crash rule, and a
+  guard that `VOICES.length <= 8`), plus two codec cases, an all-voices-present round trip and a
+  check that a payload with the crash bit clear still decodes without a crash lane.
+
+**Decisions:**
+
+- **`VOICES` order is append-only**, now commented in the file. The v4 presence bitmap is
+  positional, so inserting a voice anywhere but the end silently reinterprets every URL in the
+  wild.
+- **The bitmap is now full at 8 voices.** `encode` already throws past that. The next voice
+  (cow bell? splash as its own lane?) is a format bump, not a registry edit.
+- **Choke deliberately skipped.** It would need a new `BrushState`, a sixth brush in the sticky
+  bar, and a second synth. Worth it only if somebody asks.
+
+**Next:** Nothing queued from this. If a crash lane starts to feel cramped alongside ride on a
+phone, the fix is the Settings drawer, not fewer voices.
+
+---
+
 ## 2026-07-30: iPad round two, and v0.2
 
 **Status:** Shipped as v0.2. The user drove the iPad again and reported two things: the audio fix

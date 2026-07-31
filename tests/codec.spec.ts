@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decode, encode } from '../src/lib/codec'
 import { emptyGroove, resizeArrays, type HatValue, type NoteValue } from '../src/lib/model'
+import { VOICE_BY_ID, VOICE_IDS } from '../src/lib/voices'
 
 function random<T>(xs: readonly T[]): T {
   return xs[Math.floor(Math.random() * xs.length)]
@@ -78,6 +79,30 @@ describe('codec', () => {
     expect(decoded.voices.t2).toEqual(g.voices.t2)
     expect(decoded.voices.t3).toEqual(g.voices.t3)
     expect(decoded.voices.ride).toEqual(g.voices.ride)
+  })
+
+  it('round-trips a groove with every voice present', () => {
+    const g = emptyGroove()
+    const n = g.voices.hh.length
+    for (const [i, id] of VOICE_IDS.entries()) {
+      const states = VOICE_BY_ID[id].states.length
+      g.voices[id] = new Array(n).fill(0)
+      // Something non-zero in every voice, so each presence bit is exercised.
+      g.voices[id]![i] = 1 + (i % (states - 1))
+    }
+    const decoded = decode(encode(g))!
+    for (const id of VOICE_IDS) expect(decoded.voices[id]).toEqual(g.voices[id])
+  })
+
+  it('omits a voice whose presence bit is clear', () => {
+    // Appending a voice must not shift the layout: a groove with no crash
+    // encodes the same bytes a pre-crash build produced, and its clear bit 7
+    // must leave the crash lane absent rather than eat the trailer.
+    const g = emptyGroove()
+    g.voices.hh[0] = 1
+    g.voices.sn[4] = 1
+    const decoded = decode(encode(g))!
+    expect(decoded.voices.crash).toBeUndefined()
   })
 
   it('decodes a known v3 payload (legacy URL compat)', () => {

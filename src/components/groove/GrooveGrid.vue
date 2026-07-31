@@ -39,7 +39,7 @@ function globalIdx(measure: number, localIdx: number) {
   return measure * stepsPerMeasure.value + localIdx
 }
 
-const VISIBLE_LANES: VoiceId[] = ['hh', 'ride', 't1', 't2', 't3', 'sn', 'kk']
+const VISIBLE_LANES: VoiceId[] = ['hh', 'crash', 'ride', 't1', 't2', 't3', 'sn', 'kk']
 const lanes = computed(() =>
   VISIBLE_LANES.filter((id) => {
     const v = VOICE_BY_ID[id]

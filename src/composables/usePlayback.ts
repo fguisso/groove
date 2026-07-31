@@ -3,7 +3,7 @@ import * as Tone from 'tone'
 import type { Groove } from '@/lib/model'
 import { VOICES, effectiveSynthKey } from '@/lib/voices'
 
-type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't2' | 't3' | 'ride' | 'click'
+type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't2' | 't3' | 'ride' | 'crash' | 'click'
 type Trigger = (time: number, velocity?: number) => void
 
 /**
@@ -17,6 +17,7 @@ type Trigger = (time: number, velocity?: number) => void
  *   hh pedal:  white noise → bandpass 4.5kHz, ~50ms envelope (muted chick)
  *   tom1 / t3: MembraneSynth tuned for high tom and floor tom
  *   ride:      filtered noise + tonal partial around 5kHz
+ *   crash:     bright attack burst over a long noise wash (~1.6s), no bell partial
  *   click:     square wave, C6 on downbeat / G5 on other beats
  */
 function makeSynth(kind: SynthKey): Trigger {
@@ -136,6 +137,27 @@ function makeSynth(kind: SynthKey): Trigger {
     }
   }
 
+  if (kind === 'crash') {
+    const wash = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.002, decay: 1.6, sustain: 0.04, release: 1.2 },
+    })
+    const hp = new Tone.Filter({ type: 'highpass', frequency: 3200, Q: 0.4 })
+    wash.chain(hp, Tone.getDestination())
+    wash.volume.value = -18
+    const attack = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.08 },
+    })
+    const attackHp = new Tone.Filter({ type: 'highpass', frequency: 8000, Q: 0.5 })
+    attack.chain(attackHp, Tone.getDestination())
+    attack.volume.value = -20
+    return (time, v = 1) => {
+      wash.triggerAttackRelease('2n', time, v)
+      attack.triggerAttackRelease('16n', time, v)
+    }
+  }
+
   // click (metronome)
   const synth = new Tone.Synth({
     oscillator: { type: 'square' },
@@ -158,6 +180,7 @@ const ALL_SYNTH_KEYS: SynthKey[] = [
   't2',
   't3',
   'ride',
+  'crash',
   'click',
 ]
 

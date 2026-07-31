@@ -6,7 +6,7 @@
 // adding the synth in `usePlayback.ts`. Everything else (codec, score,
 // MIDI export) reads from here.
 
-export type VoiceId = 'hh' | 'sn' | 'kk' | 't1' | 't2' | 't3' | 'ride'
+export type VoiceId = 'hh' | 'sn' | 'kk' | 't1' | 't2' | 't3' | 'ride' | 'crash'
 export type VoiceKind = 'hat' | 'note'
 export type VoiceGroup = 'tom' | 'cymbal'
 
@@ -39,6 +39,10 @@ export interface Voice {
   group?: VoiceGroup // editor-only: lets the Settings drawer collapse lane families
 }
 
+// Order is append-only. The codec's v4 presence bitmap is positional (bit i is
+// VOICES[i]), so reordering or inserting silently reinterprets every existing
+// URL. The bitmap is one byte, so the 8 entries below fill it: a ninth voice
+// needs a format bump.
 export const VOICES: readonly Voice[] = [
   {
     id: 'hh',
@@ -150,6 +154,22 @@ export const VOICES: readonly Voice[] = [
       { midi: 51, velocity: 0.5, symbol: 'x', brush: 'ghost' },
     ],
   },
+  {
+    id: 'crash',
+    label: 'CRASH',
+    kind: 'note',
+    bitsPerCell: 2,
+    // First ledger line above the staff, one position above the hi-hat, which
+    // is where a drum chart puts a crash.
+    vexKey: 'a/5/x2',
+    defaultSynthKey: 'crash',
+    group: 'cymbal',
+    states: [
+      {},
+      { midi: 49, velocity: 0.9, symbol: 'x', brush: 'normal' },
+      { midi: 49, velocity: 1, symbol: 'X', articulation: 'a>', brush: 'accent' },
+    ],
+  },
 ]
 
 export const VOICE_IDS: readonly VoiceId[] = VOICES.map((v) => v.id)
@@ -202,9 +222,10 @@ const INPUT_ONLY_MIDI: Record<number, VoiceId> = {
   43: 't3', // high floor tom
   45: 't2', // low tom
   48: 't1', // hi-mid tom
-  49: 'ride', // crash → ride (no crash voice yet)
+  52: 'crash', // china
   53: 'ride', // ride bell
-  57: 'ride', // crash 2 → ride
+  55: 'crash', // splash
+  57: 'crash', // crash 2
   59: 'ride', // ride 2
 }
 

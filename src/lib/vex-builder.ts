@@ -20,6 +20,7 @@ import { VOICES, type VoiceId } from './voices'
 // ledger positions are halves and negatives. Keeping this here means we
 // derive marker Y from the rendered stave instead of guessing percentages.
 const VOICE_LINE: Record<VoiceId, number> = {
+  crash: -1, // a/5/x2 — first ledger line above the staff
   hh: -0.5, // g/5/x2 — above top line
   ride: 0, // f/5/x2 — top line
   t1: 0.5, // e/5

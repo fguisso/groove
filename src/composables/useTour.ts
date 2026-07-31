@@ -66,7 +66,7 @@ function steps(): DriveStep[] {
       popover: {
         title: 'Build the beat',
         description:
-          'Tap a cell to drop the selected note; tap it again to clear it. Drag along a lane to fill a whole run in one go. Because dragging paints, pick the Scroll brush below when you want to drag the grid sideways instead. Lanes cover hi-hat, ride, three toms, snare and kick.',
+          'Tap a cell to drop the selected note; tap it again to clear it. Drag along a lane to fill a whole run in one go. Because dragging paints, pick the Scroll brush below when you want to drag the grid sideways instead. Lanes cover hi-hat, crash, ride, three toms, snare and kick.',
         side: 'top',
         align: 'center',
       },
