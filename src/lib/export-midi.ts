@@ -1,5 +1,6 @@
 import { Midi } from '@tonejs/midi'
 import type { Groove } from './model'
+import { expandTimeline } from './playback-order'
 import { VOICES } from './voices'
 
 function stepDurationSec(g: Groove): number {
@@ -17,14 +18,16 @@ export async function exportMidi(g: Groove) {
   track.name = g.title || 'Groove'
 
   const step = stepDurationSec(g)
-  const total = g.voices.hh?.length ?? g.division * g.measures
   const dur = step * 0.9
+  // Repeats are written out rather than left implicit: a MIDI file has no
+  // repeat sign, so the export has to sound like the app does.
+  const slots = expandTimeline(g)
 
   for (const voice of VOICES) {
     const arr = g.voices[voice.id]
     if (!arr) continue
-    for (let i = 0; i < total; i++) {
-      const state = arr[i] ?? 0
+    for (let i = 0; i < slots.length; i++) {
+      const state = arr[slots[i].step] ?? 0
       if (state === 0) continue
       const def = voice.states[state]
       if (!def || def.midi == null || def.velocity == null) continue

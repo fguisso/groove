@@ -42,6 +42,7 @@ useUrlSync()
 const {
   isPlaying,
   currentStep,
+  currentPass,
   countInBeat,
   practiceTimerVal,
   loopCount,
@@ -250,7 +251,7 @@ async function onExportPng() {
         <PracticeClock />
       </div>
       <Transport v-if="!midi.lessonMode" :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
-      <GrooveGrid :active-step="currentStep" :is-playing="isPlaying" />
+      <GrooveGrid :active-step="currentStep" :active-pass="currentPass" :is-playing="isPlaying" />
       <StateBar :is-playing="isPlaying" @play="onPlay" @stop="onStop" />
     </main>
 

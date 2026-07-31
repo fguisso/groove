@@ -4,6 +4,7 @@ import {
   cycleVoiceCell,
   emptyGroove,
   resizeArrays,
+  MAX_REPEAT,
   type Division,
   type Groove,
   type Sticking,
@@ -87,6 +88,13 @@ export const useGrooveStore = defineStore('groove', {
       if (this.selectedMeasure > this.groove.measures - 1) {
         this.selectedMeasure = this.groove.measures - 1
       }
+    },
+    setRepeat(measure: number, n: number) {
+      if (measure < 0 || measure >= this.groove.measures) return
+      const val = Math.max(1, Math.min(MAX_REPEAT, Math.round(n)))
+      if (this.groove.repeats[measure] === val) return
+      this.pushHistory()
+      this.groove.repeats[measure] = val
     },
     toggleMetronome() {
       this.groove.metronome = !this.groove.metronome

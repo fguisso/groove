@@ -1,6 +1,7 @@
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import * as Tone from 'tone'
 import type { Groove } from '@/lib/model'
+import { expandTimeline, type PlaySlot } from '@/lib/playback-order'
 import { VOICES, effectiveSynthKey } from '@/lib/voices'
 
 type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't2' | 't3' | 'ride' | 'crash' | 'click'
@@ -194,6 +195,10 @@ export interface PlayOptions {
 export function usePlayback() {
   const isPlaying = ref(false)
   const currentStep = ref(-1)
+  // Which repetition of the sounding measure is playing, 1-based (0 = stopped).
+  // Without it the fourth pass through a repeated bar looks exactly like the
+  // first, since `currentStep` is a grid step and comes round again unchanged.
+  const currentPass = ref(0)
   const countInBeat = ref(0)
   const practiceTimerVal = ref(0)
   // Completed passes through the track since play() started. Speed training
@@ -212,7 +217,7 @@ export function usePlayback() {
   interface Timeline {
     stepSec: number
     countInLen: number
-    n: number
+    slots: PlaySlot[]
     loopLen: number
     loop: boolean
   }
@@ -380,7 +385,7 @@ export function usePlayback() {
     onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility))
   }
 
-  let lastStepDrawn = -1
+  let lastIndexDrawn = -1
 
   async function play(g: Groove, opts: PlayOptions = {}) {
     // FIRST, and before any await: the gesture's activation dies the moment we
@@ -400,11 +405,15 @@ export function usePlayback() {
     const p = ensurePlayers()
     stopInternal()
     loopCount.value = 0
-    lastStepDrawn = -1
+    lastIndexDrawn = -1
     Tone.getTransport().bpm.value = g.tempo
     applySwing(g)
 
-    const n = g.voices.hh?.length ?? g.division * g.measures
+    // The track that actually sounds: a measure with `repeats[m] = 4` appears
+    // four times here, so everything below counts expanded positions while
+    // `slot.step` still points back at the one set of cells the editor holds.
+    const slots = expandTimeline(g)
+    const n = slots.length
     const stepDur = subdivision(g)
     const beatsPerMeasure = g.timeSig[0]
     const stepsPerBeat = g.division / beatsPerMeasure
@@ -423,7 +432,7 @@ export function usePlayback() {
     // a per-second timer countdown. Looping replays everything cleanly.
     type Ev =
       | { kind: 'count'; beat: number }
-      | { kind: 'step'; step: number }
+      | { kind: 'step'; index: number; slot: PlaySlot }
       | { kind: 'timer'; secLeft: number }
       | { kind: 'end' }
     const events: [string, Ev][] = []
@@ -433,7 +442,7 @@ export function usePlayback() {
       }
     }
     for (let i = 0; i < n; i++) {
-      events.push([countInLen + stepSec * i + '', { kind: 'step', step: i }])
+      events.push([countInLen + stepSec * i + '', { kind: 'step', index: i, slot: slots[i] }])
     }
     for (let i = 0; i < pauseSec; i++) {
       events.push([trackEnd + i + '', { kind: 'timer', secLeft: pauseSec - i }])
@@ -452,6 +461,7 @@ export function usePlayback() {
           countInBeat.value = ev.beat
           practiceTimerVal.value = 0
           currentStep.value = -1
+          currentPass.value = 0
         }, time)
         return
       }
@@ -461,6 +471,7 @@ export function usePlayback() {
           practiceTimerVal.value = ev.secLeft
           countInBeat.value = 0
           currentStep.value = -1
+          currentPass.value = 0
         }, time)
         return
       }
@@ -473,7 +484,7 @@ export function usePlayback() {
         return
       }
 
-      const step = ev.step
+      const step = ev.slot.step
       for (const voice of VOICES) {
         const arr = g.voices[voice.id]
         if (!arr) continue
@@ -493,13 +504,16 @@ export function usePlayback() {
       }
 
       Tone.getDraw().schedule(() => {
-        // Wrapping back to step 0 having already played past it means the Part
-        // restarted, which is one completed loop.
-        if (step === 0 && lastStepDrawn > 0) loopCount.value++
-        lastStepDrawn = step
+        // Wrapping back to the top of the expanded track having already played
+        // past it means the Part restarted, which is one completed loop. This
+        // watches the expanded index, not the grid step: a repeated bar brings
+        // step 0 round again in the middle of a single pass.
+        if (ev.index === 0 && lastIndexDrawn > 0) loopCount.value++
+        lastIndexDrawn = ev.index
         countInBeat.value = 0
         practiceTimerVal.value = 0
         currentStep.value = step
+        currentPass.value = ev.slot.pass
       }, time)
     }, events)
 
@@ -507,7 +521,7 @@ export function usePlayback() {
     newPart.loopEnd = trackEnd + pauseSec + 's'
     newPart.start(0)
     part.value = newPart
-    timeline = { stepSec, countInLen, n, loopLen: trackEnd + pauseSec, loop: g.loop }
+    timeline = { stepSec, countInLen, slots, loopLen: trackEnd + pauseSec, loop: g.loop }
 
     Tone.getTransport().stop()
     Tone.getTransport().position = 0
@@ -529,6 +543,7 @@ export function usePlayback() {
     timeline = null
     isPlaying.value = false
     currentStep.value = -1
+    currentPass.value = 0
     countInBeat.value = 0
     practiceTimerVal.value = 0
   }
@@ -544,9 +559,10 @@ export function usePlayback() {
     const ts = Tone.getTransport().seconds
     const phase = tl.loop ? ((ts % tl.loopLen) + tl.loopLen) % tl.loopLen : ts
     const rel = phase - tl.countInLen
-    const step = Math.round(rel / tl.stepSec)
-    if (step < 0 || step >= tl.n) return null
-    return { step, deltaSec: rel - step * tl.stepSec }
+    const index = Math.round(rel / tl.stepSec)
+    if (index < 0 || index >= tl.slots.length) return null
+    // Grading is against the grid, so hand back the cell the slot reads from.
+    return { step: tl.slots[index].step, deltaSec: rel - index * tl.stepSec }
   }
 
   function updateRuntime(g: Groove) {
@@ -556,12 +572,16 @@ export function usePlayback() {
   }
 
   watch(isPlaying, (v) => {
-    if (!v) currentStep.value = -1
+    if (!v) {
+      currentStep.value = -1
+      currentPass.value = 0
+    }
   })
 
   return {
     isPlaying,
     currentStep,
+    currentPass,
     countInBeat,
     practiceTimerVal,
     loopCount,

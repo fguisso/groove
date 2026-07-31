@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Plus, ChevronLeft, ChevronRight, Minus, Repeat } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
+import { MAX_REPEAT } from '@/lib/model'
+import { repeatFor } from '@/lib/playback-order'
 
 const MAX_MEASURES = 8
 
@@ -13,6 +15,14 @@ const tabs = computed(() => Array.from({ length: groove.value.measures }, (_, i)
 const canAdd = computed(() => groove.value.measures < MAX_MEASURES)
 const canPrev = computed(() => selectedMeasure.value > 0)
 const canNext = computed(() => selectedMeasure.value < groove.value.measures - 1)
+
+const repeat = computed(() => repeatFor(groove.value, selectedMeasure.value))
+function bumpRepeat(delta: number) {
+  store.setRepeat(selectedMeasure.value, repeat.value + delta)
+}
+function repeatOf(m: number) {
+  return repeatFor(groove.value, m)
+}
 
 function addMeasure() {
   if (!canAdd.value) return
@@ -55,6 +65,7 @@ function step(delta: number) {
       @click="store.setSelectedMeasure(m)"
     >
       {{ m + 1 }}
+      <span v-if="repeatOf(m) > 1" class="measure-tab__repeat">×{{ repeatOf(m) }}</span>
     </button>
     <button
       type="button"
@@ -77,6 +88,35 @@ function step(delta: number) {
     >
       <Plus class="h-3 w-3" :stroke-width="2.5" />
     </button>
+
+    <!-- Repeat count for the selected bar. Sits with the tabs because it is the
+         same question they answer: which bar am I working on, and how does it
+         sit in the piece. -->
+    <div class="repeat-group" data-tour="repeat">
+      <Repeat class="h-3.5 w-3.5 text-muted-foreground" :stroke-width="2" />
+      <span class="hidden sm:inline text-[10px] font-mono uppercase tracking-widest">Repeat</span>
+      <button
+        type="button"
+        class="measure-tab"
+        :disabled="repeat <= 1"
+        :aria-label="`Repeat measure ${selectedMeasure + 1} one time less`"
+        title="Repeat less"
+        @click="bumpRepeat(-1)"
+      >
+        <Minus class="h-3 w-3" :stroke-width="2.5" />
+      </button>
+      <span class="repeat-value tabular">×{{ repeat }}</span>
+      <button
+        type="button"
+        class="measure-tab"
+        :disabled="repeat >= MAX_REPEAT"
+        :aria-label="`Repeat measure ${selectedMeasure + 1} one time more`"
+        title="Repeat more"
+        @click="bumpRepeat(1)"
+      >
+        <Plus class="h-3 w-3" :stroke-width="2.5" />
+      </button>
+    </div>
   </div>
 </template>
 
@@ -110,13 +150,37 @@ function step(delta: number) {
   background: hsl(var(--primary));
   border-color: hsl(var(--primary));
 }
+.measure-tab__repeat {
+  margin-left: 3px;
+  font-size: 9px;
+  opacity: 0.75;
+}
 .measure-tab--add {
   color: hsl(var(--muted-foreground));
 }
+.measure-tab:disabled,
 .measure-tab--add:disabled,
 .measure-tab--page:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.repeat-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding-left: 8px;
+  border-left: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+}
+.repeat-value {
+  min-width: 26px;
+  text-align: center;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
 }
 .measure-tab--page {
   color: hsl(var(--foreground));

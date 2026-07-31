@@ -1,4 +1,5 @@
-import { resizeArrays, type Division, type Groove, type Sticking } from './model'
+import { normalizeRepeats, resizeArrays, type Division, type Groove, type Sticking } from './model'
+import { hasRepeats as anyRepeats, repeatFor } from './playback-order'
 import { VOICES, VOICE_BY_ID, type VoiceId } from './voices'
 
 /**
@@ -15,6 +16,7 @@ import { VOICES, VOICE_BY_ID, type VoiceId } from './voices'
  *                bit 4     = countIn
  *                bit 5     = loop
  *                bit 6     = hasSticking
+ *                bit 7     = hasRepeats
  *   7       u8   voice presence bitmap; bit i corresponds to VOICES[i]
  *
  * Voice cells (in registry order, only voices whose presence bit is set):
@@ -22,6 +24,9 @@ import { VOICES, VOICE_BY_ID, type VoiceId } from './voices'
  *
  * If hasSticking:
  *   2 × stepCount, bit-packed
+ *
+ * If hasRepeats:
+ *   4 × measures, bit-packed, each holding (repeat - 1) so 1..16 fits
  *
  * Optional trailer (absent = empty title & author):
  *   u8 title_len, title_len UTF-8 bytes,
@@ -157,6 +162,7 @@ export function encode(g: Groove): string {
     }
   })
   const hasSticking = !allDash(g.sticking)
+  const hasRepeats = anyRepeats(g)
 
   w.writeByte(FORMAT_VERSION)
   w.writeByte(g.tempo & 0xff)
@@ -169,7 +175,8 @@ export function encode(g: Groove): string {
       ((g.metronome ? 1 : 0) << 3) |
       ((g.countIn ? 1 : 0) << 4) |
       ((g.loop ? 1 : 0) << 5) |
-      ((hasSticking ? 1 : 0) << 6),
+      ((hasSticking ? 1 : 0) << 6) |
+      ((hasRepeats ? 1 : 0) << 7),
   )
   w.writeByte(presence & 0xff)
 
@@ -184,6 +191,9 @@ export function encode(g: Groove): string {
       const idx = STICK.indexOf(g.sticking[i])
       w.writeBits((idx < 0 ? 0 : idx) & 0x03, 2)
     }
+  }
+  if (hasRepeats) {
+    for (let m = 0; m < g.measures; m++) w.writeBits((repeatFor(g, m) - 1) & 0x0f, 4)
   }
 
   const title = (g.title || '').slice(0, 255)
@@ -214,6 +224,7 @@ function decodeV4(r: BitReader): Groove | null {
   const countIn = !!(flags & 0x10)
   const loop = !!(flags & 0x20)
   const hasSticking = !!(flags & 0x40)
+  const hasRepeats = !!(flags & 0x80)
 
   const division = DIV_CODES[divCode]
   if (!division) return null
@@ -230,6 +241,9 @@ function decodeV4(r: BitReader): Groove | null {
 
   const sticking: Sticking[] = new Array(n).fill('-')
   if (hasSticking) for (let i = 0; i < n; i++) sticking[i] = STICK[r.readBits(2)]
+
+  const repeats = new Array(measures).fill(1) as number[]
+  if (hasRepeats) for (let m = 0; m < measures; m++) repeats[m] = r.readBits(4) + 1
 
   let title = ''
   let author = ''
@@ -257,6 +271,7 @@ function decodeV4(r: BitReader): Groove | null {
     loop,
     voices,
     sticking,
+    repeats: normalizeRepeats(repeats, measures),
   })
 }
 

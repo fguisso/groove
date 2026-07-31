@@ -4,12 +4,13 @@ import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore, type LiveMarkerGrade } from '@/stores/midi'
 import { VOICE_BY_ID, stateForBrush, type VoiceId } from '@/lib/voices'
+import { repeatFor } from '@/lib/playback-order'
 import type { Sticking } from '@/lib/model'
 import NoteCell from './NoteCell.vue'
 import MeasureTabs from './MeasureTabs.vue'
 import PresetPicker from './PresetPicker.vue'
 
-const props = defineProps<{ activeStep?: number; isPlaying?: boolean }>()
+const props = defineProps<{ activeStep?: number; isPlaying?: boolean; activePass?: number }>()
 const store = useGrooveStore()
 const { groove, selectedMeasure, brush } = storeToRefs(store)
 const midi = useMidiStore()
@@ -232,6 +233,18 @@ const activeMeasure = computed(() => {
   return Math.floor(s / stepsPerMeasure.value)
 })
 
+function repeatOf(m: number) {
+  return repeatFor(groove.value, m)
+}
+// The bar that is sounding says which time through it is; the others just say
+// how many times they will run.
+function passLabel(m: number) {
+  const total = repeatOf(m)
+  const pass = props.activePass ?? 0
+  if (m === activeMeasure.value && pass > 0) return `· ${pass}/${total}`
+  return `×${total}`
+}
+
 function setMeasureRef(el: Element | null, idx: number) {
   if (el instanceof HTMLElement) measureRefs.value[idx] = el
 }
@@ -337,6 +350,7 @@ watch([() => stepsPerMeasure.value, () => props.isPlaying, lanes], () => nextTic
             :class="m === activeMeasure ? 'text-primary' : 'text-muted-foreground'"
           >
             Measure {{ m + 1 }}
+            <span v-if="repeatOf(m) > 1" class="opacity-80">{{ passLabel(m) }}</span>
           </div>
 
           <div v-if="!showSticking && i === 0 && !props.isPlaying" class="px-3 pt-3">

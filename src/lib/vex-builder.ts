@@ -1,18 +1,21 @@
 import {
   Annotation,
   Articulation,
+  Barline,
   Beam,
   Dot,
   Formatter,
   Fraction,
   GhostNote,
   Renderer,
+  type RenderContext,
   Stave,
   StaveNote,
   Stem,
   Voice,
 } from 'vexflow'
 import type { Groove } from './model'
+import { repeatFor } from './playback-order'
 import { VOICES, type VoiceId } from './voices'
 
 // Treble-clef line numbers per voice's `vexKey`. VexFlow's `getYForLine`
@@ -193,6 +196,23 @@ function buildStickingNotes(g: Groove, measureStart: number): GhostNote[] {
   return notes
 }
 
+// The "×4" over a closing repeat sign. Drawn by hand rather than as a Stave
+// text modifier so it can be pinned to the barline itself: the formatter keeps
+// noteheads well clear of the last ~40px of the measure, so nothing (including
+// a sticking glyph, which rides above a notehead) can collide with it there.
+function drawRepeatCount(ctx: RenderContext, text: string, barlineX: number, staveY: number) {
+  ctx.save()
+  ctx.setFont('Arial', 11, 'bold')
+  let w = text.length * 6
+  try {
+    w = ctx.measureText(text).width
+  } catch {
+    // Older contexts without measureText: the estimate is close enough.
+  }
+  ctx.fillText(text, barlineX - w - 2, staveY - 8)
+  ctx.restore()
+}
+
 export interface StepMarker {
   x: number // left edge of marker in svg pixels
   width: number // width of marker in svg pixels
@@ -267,7 +287,16 @@ export function renderScore(
     measureBounds.push({ x: staveX, y: rowTop, width: measureWidth, height: ROW_HEIGHT })
     const stave = new Stave(staveX, staveY, measureWidth)
     if (m === 0) stave.addClef('percussion').addTimeSignature(`${g.timeSig[0]}/${g.timeSig[1]}`)
+    // One repeat block per measure. Two adjacent bars that both repeat get two
+    // blocks rather than one bracket around the pair, which is what the model
+    // says: each measure repeats on its own before the next one starts.
+    const repeat = repeatFor(g, m)
+    if (repeat > 1) {
+      stave.setBegBarType(Barline.type.REPEAT_BEGIN)
+      stave.setEndBarType(Barline.type.REPEAT_END)
+    }
     stave.setContext(ctx).draw()
+    if (repeat > 1) drawRepeatCount(ctx, `×${repeat}`, staveX + measureWidth, staveY)
 
     // Lines are identical across rows — capture the row-0 stave Y per voice.
     // Live markers on lower rows reuse this base and add their rowTop offset.

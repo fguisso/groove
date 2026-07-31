@@ -16,6 +16,10 @@ export const DIVISIONS: Division[] = [4, 6, 8, 12, 16, 24, 32]
 export type DefaultVoiceId = 'hh' | 'sn' | 'kk'
 export type Voices = Record<DefaultVoiceId, number[]> & Partial<Record<VoiceId, number[]>>
 
+// Upper bound on a single measure's repeat count. 16 is what four bits hold,
+// which is what the codec spends per measure.
+export const MAX_REPEAT = 16
+
 export interface Groove {
   v: 1
   title?: string
@@ -30,6 +34,20 @@ export interface Groove {
   loop: boolean
   voices: Voices
   sticking: Sticking[]
+  // How many times each measure sounds before the next one starts. Always
+  // `measures` long, every entry 1..MAX_REPEAT; 1 means no repeat.
+  repeats: number[]
+}
+
+export function normalizeRepeats(repeats: number[] | undefined, measures: number): number[] {
+  const out: number[] = new Array(Math.max(0, measures)).fill(1)
+  if (!repeats) return out
+  for (let i = 0; i < out.length; i++) {
+    const r = Math.round(repeats[i] ?? 1)
+    if (!Number.isFinite(r)) continue
+    out[i] = Math.max(1, Math.min(MAX_REPEAT, r))
+  }
+  return out
 }
 
 export function stepCount(g: Pick<Groove, 'division' | 'measures'>): number {
@@ -64,11 +82,13 @@ export function emptyGroove(overrides: Partial<Groove> = {}): Groove {
     loop: overrides.loop ?? true,
     voices: voices as Voices,
     sticking: overrides.sticking ?? new Array(n).fill('-'),
+    repeats: normalizeRepeats(overrides.repeats, measures),
   }
 }
 
-export interface PartialGroove extends Omit<Groove, 'voices'> {
+export interface PartialGroove extends Omit<Groove, 'voices' | 'repeats'> {
   voices: Partial<Record<VoiceId, number[]>>
+  repeats?: number[]
 }
 
 export function resizeArrays(g: Groove | PartialGroove): Groove {
@@ -90,7 +110,12 @@ export function resizeArrays(g: Groove | PartialGroove): Groove {
       : g.sticking.length < n
         ? [...g.sticking, ...new Array(n - g.sticking.length).fill('-' as Sticking)]
         : g.sticking.slice(0, n)
-  return { ...g, voices: voices as Voices, sticking }
+  return {
+    ...g,
+    voices: voices as Voices,
+    sticking,
+    repeats: normalizeRepeats(g.repeats, g.measures),
+  }
 }
 
 export function cycleHat(v: HatValue): HatValue {

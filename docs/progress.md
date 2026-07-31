@@ -4,6 +4,60 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-07-30: Per-measure repeats
+
+**Status:** A measure can now say how many times it sounds. `repeats[m]` is part of the groove,
+so it travels in the URL, draws as a real repeat sign, and expands in playback and in the MIDI
+export. Came from the user practicing a 6-bar piece where bar 1 wants four passes and bar 2 two,
+which today could only be spelled by duplicating bars out of an 8-measure budget.
+
+**Done:**
+
+- `model.ts` — `repeats: number[]`, always `measures` long, entries 1..`MAX_REPEAT` (16).
+  `normalizeRepeats` is called from `emptyGroove` and `resizeArrays`, so a groove from an old
+  URL, an undo snapshot or a hand-built literal always carries a valid array.
+- `playback-order.ts` (new) — `expandTimeline(g)` returns one slot per sounding position
+  (`step`, `measure`, 1-based `pass`). With every repeat at 1 it is the identity over the step
+  range, which is why nothing downstream needed a "no repeats" branch.
+- `codec.ts` — no version bump. v4's flags byte had a spare bit 7, now `hasRepeats`; when set,
+  4 bits per measure (holding `repeat - 1`) sit between the sticking block and the title
+  trailer. A groove that does not repeat encodes to exactly the bytes it did before.
+- `usePlayback.ts` — one event per expanded slot instead of one per step. `currentPass` is new.
+- `vex-builder.ts` — `|: … :|` on a repeated measure, plus a hand-drawn `×N`.
+- `export-midi.ts` — writes the expanded track. A MIDI file has no repeat sign, so the export
+  has to sound like the app.
+- UI: a Repeat stepper next to the measure tabs (acting on the selected bar), a `×N` badge on
+  the tabs themselves, and `· 2/4` in the play-stack header of the bar that is sounding.
+
+**Decisions:**
+
+- **`currentStep` stays a grid step.** Everything downstream (score marker, grid highlight,
+  MIDI grading, the measure snapshot on stop) reads it as an index into the cell arrays; the
+  same index simply comes round more than once. Only loop detection had to move to the expanded
+  index, because with repeats step 0 recurs inside one pass through the track.
+- **A spare flag bit, not v5.** The alternative was a format bump for four bits per measure.
+  Bit 7 was free and using it keeps every existing URL byte-identical, which matters when the
+  URL is the only storage the app has.
+- **One repeat block per measure, no multi-bar brackets.** Two adjacent repeated bars render as
+  two blocks. That is what the model says; a bracket would need a range in the model, which is
+  a bigger feature than the one that was asked for. Voltas are out for the same reason.
+- **`currentPass` exists because the fourth pass is otherwise invisible.** Bar 1 on pass 4 looks
+  exactly like pass 1 on the grid, which is the one thing a repeat makes hard to follow.
+
+**Sensors:** typecheck, eslint, prettier check, vitest (49 tests, 10 new), `npm run build`.
+
+**Verified in Chrome** against the user's own "Tocata - lousa" URL: setting bar 1 to ×4 and bar 2
+to ×2 draws both repeat blocks with the counts over their closing signs, writes the hash, and a
+full reload brings both counts back with the rest of the groove intact.
+
+**Caveat, the same one every playback change carries here:** the transport could not be driven in
+this environment (the window reports `visibilityState: hidden`, so `Tone.getDraw()` never fires
+and audio will not start without a real gesture). The expansion itself is unit-tested and the
+scheduler change is a substitution of the event list, but the audible order, the pass readout and
+the loop-count wrap need a real listen.
+
+---
+
 ## 2026-07-30: Crash lane
 
 **Status:** `crash` is a first-class voice. Eighth and last slot of the v4 presence bitmap.
