@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGrooveStore } from '@/stores/groove'
 import { useMidiStore } from '@/stores/midi'
 import { renderScore, type MeasureBounds, type StepMarker } from '@/lib/vex-builder'
 import type { VoiceId } from '@/lib/voices'
+import { repeatFor } from '@/lib/playback-order'
+import { followOffset } from '@/lib/score-layout'
+import { useScoreViewStore } from '@/stores/scoreView'
 
 const props = withDefaults(
-  defineProps<{ activeStep?: number; isPlaying?: boolean; selectable?: boolean }>(),
-  { selectable: true },
+  defineProps<{
+    activeStep?: number
+    activePass?: number
+    isPlaying?: boolean
+    selectable?: boolean
+  }>(),
+  { selectable: true, activePass: 1 },
 )
 
 const store = useGrooveStore()
@@ -20,11 +28,15 @@ const host = ref<HTMLDivElement | null>(null)
 const stepMarkers = ref<StepMarker[]>([])
 const voiceY = ref<Record<VoiceId, number>>({} as Record<VoiceId, number>)
 const measureBounds = ref<MeasureBounds[]>([])
+const { followPlayhead } = storeToRefs(useScoreViewStore())
+const following = computed(() => props.isPlaying && followPlayhead.value)
+const viewportWidth = ref(0)
+const scoreWidth = ref(0)
+const activeMeasure = computed(() => Math.floor((props.activeStep ?? -1) / groove.value.division))
+const activeRepeat = computed(() => repeatFor(groove.value, activeMeasure.value))
 
 function availableWidth(): number {
-  // The inner host div is inside an `inline-block` wrap, so its clientWidth is
-  // 0 before the SVG is drawn. Read from the outer score-host (block-level)
-  // and subtract its horizontal padding so the SVG fits exactly.
+  // The track can be wider than its viewport; never size the score from it.
   const root = hostRoot.value
   if (!root) return 720
   const cs = getComputedStyle(root)
@@ -36,31 +48,18 @@ function availableWidth(): number {
 function redraw() {
   if (!host.value) return
   try {
+    viewportWidth.value = availableWidth()
     const res = renderScore(host.value, groove.value, {
-      width: availableWidth(),
-      singleRow: props.isPlaying,
+      width: viewportWidth.value,
+      singleRow: following.value,
     })
     stepMarkers.value = res.stepMarkers
     voiceY.value = res.voiceY
     measureBounds.value = res.measureBounds
+    scoreWidth.value = Number(res.svg?.getAttribute('width')) || availableWidth()
   } catch (e) {
     console.warn('[score] render failed', e)
   }
-}
-
-// During playback keep the active step pinned to the horizontal center so the
-// player never has to scroll by hand: the playhead stays put and the chart
-// slides behind it. Snaps instantly (no smooth animation) so it can't lag the
-// beat at fast tempos. When paused, scrolling is left to the user.
-function scrollActiveIntoView() {
-  if (!props.isPlaying) return
-  const root = hostRoot.value
-  const m = marker.value
-  if (!root || !m) return
-  const center = m.x + m.width / 2
-  const target = center - root.clientWidth / 2
-  const max = root.scrollWidth - root.clientWidth
-  root.scrollLeft = Math.max(0, Math.min(target, max))
 }
 
 let ro: ResizeObserver | null = null
@@ -79,26 +78,20 @@ onBeforeUnmount(() => {
 })
 watch(groove, redraw, { deep: true })
 
-// Re-render when entering/leaving playback so the staff switches between the
-// wrapped (paused, readable) and single-row (playing, scrollable) layouts.
-watch(
-  () => props.isPlaying,
-  () => {
-    redraw()
-    nextTick(scrollActiveIntoView)
-  },
-)
-
-// Follow the playhead while it moves.
-watch(
-  () => props.activeStep,
-  () => scrollActiveIntoView(),
-)
+watch(following, () => {
+  redraw()
+  if (hostRoot.value) hostRoot.value.scrollLeft = 0
+})
 
 const marker = computed(() => {
   const i = props.activeStep ?? -1
-  if (i < 0 || i >= stepMarkers.value.length) return null
+  if (!props.isPlaying || i < 0 || i >= stepMarkers.value.length) return null
   return stepMarkers.value[i]
+})
+
+const trackOffset = computed(() => {
+  if (!following.value || !marker.value) return 0
+  return followOffset(marker.value.x + marker.value.width / 2, viewportWidth.value)
 })
 
 interface MarkerPosition {
@@ -132,42 +125,63 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="hostRoot" class="score-host w-full overflow-x-auto text-center">
-    <div class="score-wrap">
-      <div ref="host" />
-      <button
-        v-for="(b, m) in measureBounds"
-        v-show="props.selectable"
-        :key="'mh-' + m"
-        type="button"
-        class="score-measure-hit"
-        :class="{ 'is-selected': !props.isPlaying && m === selectedMeasure }"
-        :style="{
-          left: b.x + 'px',
-          top: b.y + 'px',
-          width: b.width + 'px',
-          height: b.height + 'px',
-        }"
-        :disabled="props.isPlaying"
-        :aria-label="`Select measure ${m + 1}`"
-        @click="store.setSelectedMeasure(m)"
-      />
+  <div class="min-w-0 space-y-2">
+    <span
+      v-if="props.isPlaying && activeMeasure >= 0"
+      class="text-xs text-muted-foreground tabular"
+    >
+      Bar {{ activeMeasure + 1 }} / {{ groove.measures }}
+      <template v-if="activeRepeat > 1">
+        · Pass {{ props.activePass }} / {{ activeRepeat }}</template
+      >
+    </span>
+    <div
+      ref="hostRoot"
+      class="score-host w-full overflow-x-auto text-center"
+      :class="{ 'score-host--following': following }"
+    >
       <div
-        v-if="marker"
-        class="score-marker"
+        class="score-wrap"
         :style="{
-          left: marker.x + 'px',
-          top: marker.y + 'px',
-          width: marker.width + 'px',
-          height: marker.height + 'px',
+          width: scoreWidth + 'px',
+          transform: following ? `translateX(${trackOffset}px)` : undefined,
         }"
-      />
-      <div
-        v-for="m in markerPositions"
-        :key="m.id"
-        :class="m.cls"
-        :style="{ left: m.x + 'px', top: m.y + 'px' }"
-      />
+      >
+        <div ref="host" />
+        <button
+          v-for="(b, m) in measureBounds"
+          v-show="props.selectable"
+          :key="'mh-' + m"
+          type="button"
+          class="score-measure-hit"
+          :class="{ 'is-selected': !props.isPlaying && m === selectedMeasure }"
+          :style="{
+            left: b.x + 'px',
+            top: b.y + 'px',
+            width: b.width + 'px',
+            height: b.height + 'px',
+          }"
+          :disabled="props.isPlaying"
+          :aria-label="`Select measure ${m + 1}`"
+          @click="store.setSelectedMeasure(m)"
+        />
+        <div
+          v-if="marker"
+          class="score-marker"
+          :style="{
+            left: marker.x + 'px',
+            top: marker.y + 'px',
+            width: marker.width + 'px',
+            height: marker.height + 'px',
+          }"
+        />
+        <div
+          v-for="m in markerPositions"
+          :key="m.id"
+          :class="m.cls"
+          :style="{ left: m.x + 'px', top: m.y + 'px' }"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -175,8 +189,19 @@ defineExpose({
 <style scoped>
 .score-wrap {
   position: relative;
-  display: inline-block;
-  vertical-align: top;
+  min-width: 100%;
+}
+
+.score-wrap :deep(svg) {
+  max-width: none;
+}
+
+.score-host--following {
+  overflow: clip;
+}
+
+.score-host--following .score-marker {
+  transition: none;
 }
 
 .score-marker {

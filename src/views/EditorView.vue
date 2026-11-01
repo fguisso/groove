@@ -247,7 +247,12 @@ async function onExportPng() {
            the practice tools are for studying afterwards, not for catching a
            bar as it is dictated, so they step aside and the grid gets the room. -->
       <div v-if="!midi.lessonMode" class="relative" data-tour="score">
-        <Score ref="scoreRef" :active-step="currentStep" :is-playing="isPlaying" />
+        <Score
+          ref="scoreRef"
+          :active-step="currentStep"
+          :active-pass="currentPass"
+          :is-playing="isPlaying"
+        />
         <PracticeClock />
       </div>
       <Transport v-if="!midi.lessonMode" :is-playing="isPlaying" @play="onPlay" @stop="onStop" />

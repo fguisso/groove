@@ -37,8 +37,17 @@ const editorUrl = computed(() => {
 
 useUrlSync({ writeBack: false })
 
-const { isPlaying, currentStep, countInBeat, loopCount, play, stop, updateRuntime, setOnEnded } =
-  usePlayback()
+const {
+  isPlaying,
+  currentStep,
+  currentPass,
+  countInBeat,
+  loopCount,
+  play,
+  stop,
+  updateRuntime,
+  setOnEnded,
+} = usePlayback()
 const wakeLock = useWakeLock()
 
 // Same speed-training rule as the editor; the embed is a practice surface too.
@@ -115,10 +124,21 @@ watch(groove, postHeight, { deep: true })
       </a>
     </div>
     <div class="relative">
-      <Score :active-step="currentStep" :is-playing="isPlaying" :selectable="false" />
+      <Score
+        :active-step="currentStep"
+        :active-pass="currentPass"
+        :is-playing="isPlaying"
+        :selectable="false"
+      />
       <PracticeClock />
     </div>
-    <Transport :is-playing="isPlaying" :read-only="readOnly" @play="onPlay" @stop="onStop" />
+    <Transport
+      embedded
+      :is-playing="isPlaying"
+      :read-only="readOnly"
+      @play="onPlay"
+      @stop="onStop"
+    />
 
     <Transition name="count-fade">
       <div

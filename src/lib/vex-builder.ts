@@ -16,6 +16,7 @@ import {
 } from 'vexflow'
 import type { Groove } from './model'
 import { repeatFor } from './playback-order'
+import { scoreLayout } from './score-layout'
 import { VOICES, type VoiceId } from './voices'
 
 // Treble-clef line numbers per voice's `vexKey`. VexFlow's `getYForLine`
@@ -245,27 +246,15 @@ export function renderScore(
   const measures = g.measures
   const width = opts.width ?? Math.max(360, container.clientWidth || 720)
 
-  // Wrap measures onto new rows once they'd get too narrow to read, like a real
-  // score. A handful of measures still stretch to fill the available width.
-  const PADDING_X = 20
-  const ROW_HEIGHT = 120
+  const {
+    padding: PADDING_X,
+    rowHeight: ROW_HEIGHT,
+    perRow,
+    measureWidth,
+    totalWidth,
+    height,
+  } = scoreLayout(width, measures, stepsPerMeasure, opts.singleRow)
   const STAVE_TOP_IN_ROW = 40 // headroom above each stave for the sticking glyphs
-  // Each measure needs room to space its steps legibly; dense divisions (24ths,
-  // 32nds) need more than the base minimum. If even one measure can't fit the
-  // container we keep it at this width and let the score-host scroll, rather
-  // than handing the formatter too little width and pushing notes past the
-  // barline (the old 24ths-in-embed clip).
-  const minMeasureW = Math.max(240, stepsPerMeasure * 16)
-  const avail = Math.max(minMeasureW, width - PADDING_X * 2)
-  // During playback we lay every measure on one horizontal row so the chart can
-  // scroll behind a centered playhead instead of wrapping out of view.
-  const perRow = opts.singleRow
-    ? measures
-    : Math.min(measures, Math.max(1, Math.floor(avail / minMeasureW)))
-  const rows = Math.ceil(measures / perRow)
-  const measureWidth = Math.max(minMeasureW, avail / perRow)
-  const totalWidth = PADDING_X * 2 + measureWidth * perRow
-  const height = rows * ROW_HEIGHT + 20
 
   const renderer = new Renderer(container, Renderer.Backends.SVG)
   renderer.resize(totalWidth, height)

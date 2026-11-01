@@ -1,16 +1,7 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  Play,
-  Square,
-  Repeat,
-  Timer,
-  Waves,
-  Hourglass,
-  SlidersHorizontal,
-  Gauge,
-} from 'lucide-vue-next'
+import { Play, Square, Repeat, Waves, SlidersHorizontal, Gauge } from 'lucide-vue-next'
 import { useGrooveStore } from '@/stores/groove'
 import { usePracticeTimerStore } from '@/stores/practiceTimer'
 import { useMidiStore } from '@/stores/midi'
@@ -18,10 +9,12 @@ import { useSpeedTrainerStore } from '@/stores/speedTrainer'
 import Slider from '@/components/ui/Slider.vue'
 import Switch from '@/components/ui/Switch.vue'
 import MetronomeIcon from '@/components/icons/MetronomeIcon.vue'
+import { useScoreViewStore } from '@/stores/scoreView'
 
 const props = defineProps<{
   isPlaying: boolean
   readOnly?: boolean
+  embedded?: boolean
 }>()
 const emit = defineEmits<{ (e: 'play'): void; (e: 'stop'): void }>()
 
@@ -32,6 +25,7 @@ const { enabled: timerEnabled, minutes: timerMinutes } = storeToRefs(timerStore)
 const midi = useMidiStore()
 const { practiceMode, practiceTimerSec } = storeToRefs(midi)
 const speed = useSpeedTrainerStore()
+const scoreView = useScoreViewStore()
 const {
   enabled: speedEnabled,
   everyLoops: speedEvery,
@@ -39,27 +33,11 @@ const {
   targetBpm: speedTarget,
 } = storeToRefs(speed)
 
-// Mobile collapses the secondary toggles behind an "Options" disclosure to keep
-// the transport short; desktop (md+) always shows them inline.
 const optionsOpen = ref(false)
-const optionsEl = ref<HTMLElement | null>(null)
+const optionsId = useId()
 
-// The bottom brush bar is sticky and roughly 180px tall on a phone, so opening
-// Options in the middle of a scrolled page can reveal it straight underneath
-// the bar. `scroll-margin-bottom` on the panel tells the browser how much room
-// to leave; doing the arithmetic by hand here was fragile and silently wrong.
 function toggleOptions() {
   optionsOpen.value = !optionsOpen.value
-  if (!optionsOpen.value) return
-  nextTick(() => {
-    const el = optionsEl.value
-    if (!el) return
-    // The panel just went from `display: none` to `flex`. Read a layout
-    // property first: without it the browser can still be holding the stale
-    // (zero-sized) box and decides no scrolling is needed.
-    void el.offsetHeight
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  })
 }
 
 // Auto-disable the timer if the user turns loop off — without a loop the timer
@@ -76,6 +54,13 @@ function onToggleTimer(v: boolean) {
   timerStore.setEnabled(v)
 }
 
+function onTempoChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const value = input.valueAsNumber
+  if (Number.isFinite(value)) store.setTempo(value)
+  input.value = String(groove.value.tempo)
+}
+
 function onMinutesInput(e: Event) {
   const v = Number((e.target as HTMLInputElement).value)
   timerStore.setMinutes(v)
@@ -88,220 +73,80 @@ function onPauseSecInput(e: Event) {
 </script>
 
 <template>
-  <section class="panel flex flex-wrap items-center gap-x-5 gap-y-3 p-3" data-tour="transport">
-    <!-- Play and the tempo readout live in the bottom bar on a phone, inside the
+  <section class="panel space-y-3 p-3" data-tour="transport">
+    <div class="transport-main flex flex-wrap items-center gap-3">
+      <!-- Play and the tempo readout live in the bottom bar on a phone, inside the
          thumb's reach. Rendering them here too would be a duplicate control. -->
-    <button
-      v-if="!props.isPlaying"
-      type="button"
-      class="transport-play hidden md:inline-flex"
-      aria-label="Play"
-      @click="emit('play')"
-    >
-      <Play class="h-5 w-5 translate-x-0.5" :stroke-width="2.5" />
-    </button>
-    <button
-      v-else
-      type="button"
-      class="transport-play playing hidden md:inline-flex"
-      aria-label="Stop"
-      @click="emit('stop')"
-    >
-      <Square class="h-4 w-4" :stroke-width="2.5" fill="currentColor" />
-    </button>
+      <button
+        v-if="!props.isPlaying"
+        type="button"
+        class="transport-play"
+        :class="props.embedded ? 'inline-flex' : 'hidden md:inline-flex'"
+        aria-label="Play"
+        @click="emit('play')"
+      >
+        <Play class="h-5 w-5 translate-x-0.5" :stroke-width="2.5" />
+      </button>
+      <button
+        v-else
+        type="button"
+        class="transport-play playing"
+        :class="props.embedded ? 'inline-flex' : 'hidden md:inline-flex'"
+        aria-label="Stop"
+        @click="emit('stop')"
+      >
+        <Square class="h-4 w-4" :stroke-width="2.5" fill="currentColor" />
+      </button>
 
-    <div class="hidden md:flex items-baseline gap-1 px-1">
-      <span class="tempo-display text-4xl">{{ groove.tempo }}</span>
-      <span class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">bpm</span>
-    </div>
+      <div class="items-baseline gap-1 px-1" :class="props.embedded ? 'flex' : 'hidden md:flex'">
+        <input
+          type="number"
+          aria-label="Tempo BPM"
+          title="Type a tempo, then press Enter"
+          class="tempo-display tempo-input text-3xl"
+          inputmode="numeric"
+          min="30"
+          max="300"
+          step="1"
+          :value="groove.tempo"
+          @change="onTempoChange"
+          @keydown.enter="($event.target as HTMLInputElement).blur()"
+        />
+        <span class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+          >bpm</span
+        >
+      </div>
 
-    <!-- Loop carries its own word, not just the icon: the label is most of the
+      <!-- Loop carries its own word, not just the icon: the label is most of the
          click target, and it is the toggle people reach for constantly. -->
-    <button
-      v-if="!props.readOnly"
-      type="button"
-      class="loop-btn touch-target"
-      :class="{ 'is-on': groove.loop }"
-      :aria-pressed="groove.loop"
-      :title="
-        groove.loop ? 'Loop is on, click to play once through' : 'Loop the groove continuously'
-      "
-      @click="store.toggleLoop()"
-    >
-      <Repeat class="h-3.5 w-3.5" />
-      <span>Loop</span>
-    </button>
-
-    <div class="hidden sm:block h-8 w-px bg-border" />
-
-    <!-- Options sits beside Loop on the first row. Left to flex-wrap with
-         `ml-auto`, it landed wherever the sliders happened to break, which read
-         as a stray button in the middle of the panel. -->
-    <button
-      type="button"
-      class="touch-target md:hidden ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-      :aria-expanded="optionsOpen"
-      @click="toggleOptions"
-    >
-      <SlidersHorizontal class="h-3.5 w-3.5" />
-      Options
-    </button>
-
-    <div class="basis-full md:basis-auto flex items-center gap-2 min-w-[160px] md:flex-1">
-      <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
-        >Tempo</label
-      >
-      <Slider
-        :model-value="groove.tempo"
-        :min="40"
-        :max="260"
-        :step="1"
-        @update:model-value="store.setTempo($event)"
-      />
-    </div>
-
-    <div
-      v-if="!props.readOnly"
-      class="basis-full md:basis-auto flex items-center gap-2 min-w-[150px] md:flex-1"
-    >
-      <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
-        >Swing</label
-      >
-      <Slider
-        :model-value="groove.swing"
-        :min="0"
-        :max="80"
-        :step="1"
-        @update:model-value="store.setSwing($event)"
-      />
-      <span class="font-mono tabular text-xs text-muted-foreground w-8 text-right"
-        >{{ groove.swing }}%</span
-      >
-    </div>
-
-    <!-- Practice options. Below `md` these stack one per row, name on the left
-         and controls on the right, because five multi-input toggles sharing a
-         wrapping flex row read as a pile of loose numbers on a phone. -->
-    <div
-      ref="optionsEl"
-      class="opt-group basis-full md:basis-auto md:ml-auto flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-3 md:border-t-0 md:pt-0"
-      :class="optionsOpen ? 'flex' : 'hidden md:flex'"
-      data-tour="playback-options"
-    >
-      <!-- Speed training: raise the tempo every N loops up to a target. -->
-      <label
+      <button
         v-if="!props.readOnly"
-        class="opt opt--wide"
-        title="Speed training: add N BPM every M loops until the target tempo"
-      >
-        <span class="opt__name">
-          <Gauge class="h-3.5 w-3.5" />
-          <span>Speed</span>
-        </span>
-        <span class="opt__ctl">
-          <Switch :model-value="speedEnabled" @update:model-value="speed.setEnabled($event)" />
-          <span class="opt__unit">+</span>
-          <input
-            type="number"
-            min="1"
-            max="40"
-            step="1"
-            inputmode="numeric"
-            aria-label="Speed training, BPM added each time"
-            class="opt__num"
-            :value="speedStep"
-            @input="speed.setStepBpm(Number(($event.target as HTMLInputElement).value))"
-          />
-          <span class="opt__unit">bpm every</span>
-          <input
-            type="number"
-            min="1"
-            max="32"
-            step="1"
-            inputmode="numeric"
-            aria-label="Speed training, loops between increases"
-            class="opt__num"
-            :value="speedEvery"
-            @input="speed.setEveryLoops(Number(($event.target as HTMLInputElement).value))"
-          />
-          <span class="opt__unit">loops, to</span>
-          <input
-            type="number"
-            min="40"
-            max="260"
-            step="1"
-            inputmode="numeric"
-            aria-label="Speed training, target tempo"
-            class="opt__num opt__num--wide"
-            :value="speedTarget"
-            @input="speed.setTargetBpm(Number(($event.target as HTMLInputElement).value))"
-          />
-        </span>
-      </label>
-
-      <!-- Pause between loops: a silent review window before the loop repeats.
-           A general player option now (not buried in MIDI settings, not gated on
-           the loop toggle); it simply takes effect whenever a loop is running. -->
-      <label
-        class="opt"
+        type="button"
+        class="loop-btn touch-target"
+        :class="{ 'is-on': groove.loop }"
+        :aria-pressed="groove.loop"
         :title="
-          practiceMode
-            ? `Pause between loops: on (${practiceTimerSec}s review), a silent countdown before the loop repeats`
-            : 'Pause between loops: off. Adds a silent review gap before each loop repeats'
+          groove.loop ? 'Loop is on, click to play once through' : 'Loop the groove continuously'
         "
+        @click="store.toggleLoop()"
       >
-        <span class="opt__name">
-          <Hourglass class="h-3.5 w-3.5" />
-          <span>Pause</span>
-        </span>
-        <span class="opt__ctl">
-          <Switch :model-value="practiceMode" @update:model-value="midi.setPracticeMode($event)" />
-          <input
-            type="number"
-            min="1"
-            max="60"
-            step="1"
-            inputmode="numeric"
-            aria-label="Pause between loops, seconds"
-            class="opt__num"
-            :value="practiceTimerSec"
-            @input="onPauseSecInput"
-          />
-          <span class="opt__unit">s</span>
-        </span>
-      </label>
+        <Repeat class="h-3.5 w-3.5" />
+        <span>Loop</span>
+      </button>
 
-      <label
-        class="opt"
-        :class="!groove.loop && 'is-disabled'"
-        :title="
-          !groove.loop
-            ? 'Practice timer: enable loop first'
-            : timerEnabled
-              ? `Practice timer: on (${timerMinutes} min), click to disable`
-              : 'Practice timer: off. Auto-stops playback after N minutes'
-        "
-      >
-        <span class="opt__name">
-          <Timer class="h-3.5 w-3.5" />
-          <span>Timer</span>
-        </span>
-        <span class="opt__ctl">
-          <Switch :model-value="timerEnabled" @update:model-value="onToggleTimer($event)" />
-          <input
-            type="number"
-            min="1"
-            max="60"
-            step="1"
-            inputmode="numeric"
-            aria-label="Practice timer minutes"
-            class="opt__num"
-            :value="timerMinutes"
-            @input="onMinutesInput"
-          />
-          <span class="opt__unit">min</span>
-        </span>
-      </label>
+      <div class="flex min-w-[140px] flex-1 items-center gap-2">
+        <label class="text-[10px] font-mono uppercase tracking-widest text-muted-foreground w-14"
+          >Tempo</label
+        >
+        <Slider
+          aria-label="Tempo"
+          :model-value="groove.tempo"
+          :min="30"
+          :max="300"
+          :step="1"
+          @update:model-value="store.setTempo($event)"
+        />
+      </div>
 
       <label
         v-if="!props.readOnly"
@@ -317,32 +162,219 @@ function onPauseSecInput(e: Event) {
           <span>Metro</span>
         </span>
         <span class="opt__ctl">
-          <Switch :model-value="groove.metronome" @update:model-value="store.toggleMetronome()" />
+          <Switch
+            aria-label="Metronome"
+            :model-value="groove.metronome"
+            @update:model-value="store.toggleMetronome()"
+          />
         </span>
       </label>
-
-      <label
-        v-if="!props.readOnly"
-        class="opt"
-        :title="
-          groove.countIn
-            ? 'Count-in: on, click to disable the lead-in bar'
-            : 'Count-in: off. Plays a bar of clicks before starting'
-        "
+      <button
+        type="button"
+        class="touch-target ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        :aria-expanded="optionsOpen"
+        :aria-controls="optionsId"
+        @click="toggleOptions"
       >
-        <span class="opt__name">
-          <Waves class="h-3.5 w-3.5" />
-          <span>Count-in</span>
-        </span>
-        <span class="opt__ctl">
-          <Switch :model-value="groove.countIn" @update:model-value="store.toggleCountIn()" />
-        </span>
-      </label>
+        <SlidersHorizontal class="h-3.5 w-3.5" />
+        {{ optionsOpen ? 'Less' : 'More' }}
+      </button>
+    </div>
+    <div v-show="optionsOpen" :id="optionsId" class="advanced-options" data-tour="playback-options">
+      <section class="settings-section" aria-label="Playback options">
+        <h3 class="settings-title">Playback</h3>
+        <div class="setting-row">
+          <span class="setting-name"> Follow playhead </span>
+          <Switch
+            aria-label="Follow playhead"
+            :model-value="scoreView.followPlayhead"
+            @update:model-value="scoreView.setFollowPlayhead($event)"
+          />
+        </div>
+        <div v-if="!props.readOnly" class="setting-row">
+          <span class="setting-name">Count-in</span>
+          <Switch
+            aria-label="Count-in"
+            :model-value="groove.countIn"
+            @update:model-value="store.toggleCountIn()"
+          />
+        </div>
+        <div v-if="!props.readOnly" class="swing-setting">
+          <div class="setting-row">
+            <span class="setting-name"><Waves class="h-3.5 w-3.5" />Swing</span>
+            <span class="setting-value">{{ groove.swing }}%</span>
+          </div>
+          <Slider
+            aria-label="Swing"
+            :model-value="groove.swing"
+            :min="0"
+            :max="80"
+            :step="1"
+            @update:model-value="store.setSwing($event)"
+          />
+        </div>
+      </section>
+      <section class="settings-section" aria-label="Practice options">
+        <h3 class="settings-title">Loop practice</h3>
+        <div class="setting-row">
+          <span class="setting-name">Pause between loops</span>
+          <Switch
+            aria-label="Pause between loops"
+            :model-value="practiceMode"
+            @update:model-value="midi.setPracticeMode($event)"
+          />
+        </div>
+        <label v-show="practiceMode" class="detail-row">
+          <span>Pause duration</span>
+          <span class="unit-input">
+            <input
+              type="number"
+              min="1"
+              max="60"
+              step="1"
+              inputmode="numeric"
+              aria-label="Pause between loops, seconds"
+              class="setting-number"
+              :value="practiceTimerSec"
+              @input="onPauseSecInput"
+            />
+            <span>sec</span>
+          </span>
+        </label>
+        <div class="setting-row" :class="{ 'setting-row--disabled': !groove.loop }">
+          <span class="setting-name">Practice timer</span>
+          <Switch
+            aria-label="Practice timer"
+            :disabled="!groove.loop"
+            :model-value="timerEnabled"
+            @update:model-value="onToggleTimer($event)"
+          />
+        </div>
+        <label v-show="timerEnabled && groove.loop" class="detail-row">
+          <span>Stop after</span>
+          <span class="unit-input">
+            <input
+              type="number"
+              min="1"
+              max="60"
+              step="1"
+              inputmode="numeric"
+              aria-label="Practice timer minutes"
+              class="setting-number"
+              :disabled="!groove.loop"
+              :value="timerMinutes"
+              @input="onMinutesInput"
+            />
+            <span>min</span>
+          </span>
+        </label>
+        <p v-if="!groove.loop" class="setting-hint">Enable Loop to use the timer.</p>
+      </section>
+      <section v-if="!props.readOnly" class="settings-section" aria-label="Speed training options">
+        <div class="speed-setting">
+          <div class="setting-row">
+            <h3 class="settings-title"><Gauge class="h-3.5 w-3.5" />Speed training</h3>
+            <Switch
+              aria-label="Speed training"
+              :model-value="speedEnabled"
+              @update:model-value="speed.setEnabled($event)"
+            />
+          </div>
+          <p class="setting-hint speed-description">Increase the tempo gradually as you repeat.</p>
+          <div v-show="speedEnabled" class="training-fields">
+            <label class="training-field">
+              <span>Add BPM</span>
+              <input
+                type="number"
+                min="1"
+                max="40"
+                step="1"
+                inputmode="numeric"
+                aria-label="Speed training, BPM added each time"
+                class="setting-number"
+                :value="speedStep"
+                @input="speed.setStepBpm(Number(($event.target as HTMLInputElement).value))"
+              />
+            </label>
+            <label class="training-field">
+              <span>Every (loops)</span>
+              <input
+                type="number"
+                min="1"
+                max="32"
+                step="1"
+                inputmode="numeric"
+                aria-label="Speed training, loops between increases"
+                class="setting-number"
+                :value="speedEvery"
+                @input="speed.setEveryLoops(Number(($event.target as HTMLInputElement).value))"
+              />
+            </label>
+            <label class="training-field">
+              <span>Target BPM</span>
+              <input
+                type="number"
+                min="40"
+                max="260"
+                step="1"
+                inputmode="numeric"
+                aria-label="Speed training, target tempo"
+                class="setting-number"
+                :value="speedTarget"
+                @input="speed.setTargetBpm(Number(($event.target as HTMLInputElement).value))"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
+      <section v-if="!props.readOnly" class="settings-section" aria-label="Editor display options">
+        <h3 class="settings-title">Editor lanes</h3>
+        <label class="setting-row lane-option">
+          <span>Show cymbals</span>
+          <Switch
+            aria-label="Show cymbals"
+            :model-value="midi.showCymbals"
+            @update:model-value="midi.setShowCymbals($event)"
+          />
+        </label>
+        <label class="setting-row lane-option">
+          <span>Show toms</span>
+          <Switch
+            aria-label="Show toms"
+            :model-value="midi.showToms"
+            @update:model-value="midi.setShowToms($event)"
+          />
+        </label>
+        <p class="setting-hint">Grid only. All notes still appear in the score and play.</p>
+      </section>
     </div>
   </section>
 </template>
 
 <style scoped>
+.tempo-input {
+  width: 3.5ch;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.tempo-input:hover {
+  border-color: hsl(var(--border));
+}
+.tempo-input:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  background: hsl(var(--background));
+}
+.tempo-input::-webkit-outer-spin-button,
+.tempo-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .loop-btn {
   display: inline-flex;
   align-items: center;
@@ -374,12 +406,6 @@ function onPauseSecInput(e: Event) {
   border-color: hsl(var(--primary));
 }
 
-.opt-group {
-  /* Room for the sticky brush bar underneath, so scrollIntoView does not park
-     the panel behind it. Generous on purpose: overshooting costs nothing. */
-  scroll-margin-bottom: 220px;
-}
-
 .opt {
   display: flex;
   align-items: center;
@@ -391,105 +417,172 @@ function onPauseSecInput(e: Event) {
   color: hsl(var(--muted-foreground));
   cursor: pointer;
 }
-.opt.is-disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.opt__name {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-}
+.opt__name,
 .opt__ctl {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
 }
-.opt__unit {
-  font-size: 10px;
-  text-transform: lowercase;
-  letter-spacing: 0;
-  white-space: nowrap;
+
+.advanced-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--border));
 }
-.opt__num {
-  width: 2.5rem;
-  padding: 0.125rem 0.25rem;
-  font-family: inherit;
-  font-size: 11px;
+.lane-option {
+  cursor: pointer;
+  font-size: 13px;
+}
+.settings-section {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border) / 0.55);
+}
+.settings-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+}
+.setting-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  line-height: 20px;
+}
+.setting-name svg {
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+}
+.setting-value,
+.setting-number {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.setting-value {
+  color: hsl(var(--muted-foreground));
+}
+.swing-setting {
+  margin-top: 8px;
+}
+.detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.unit-input {
+  position: relative;
+  display: inline-flex;
+  width: 88px;
+  flex-shrink: 0;
+}
+.unit-input .setting-number {
+  padding-right: 32px;
+}
+.unit-input > span {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 11px;
+}
+.setting-number {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
   text-align: center;
   color: hsl(var(--foreground));
   background: hsl(var(--background));
   border: 1px solid hsl(var(--border));
-  border-radius: 0.25rem;
-  touch-action: manipulation;
-  /* Kill the number spinner. It is unhittable with a thumb and it steals about
-     15px from the field, which was clipping "140" to "14". */
+  border-radius: 5px;
   appearance: textfield;
   -moz-appearance: textfield;
 }
-.opt__num::-webkit-outer-spin-button,
-.opt__num::-webkit-inner-spin-button {
+.setting-number::-webkit-outer-spin-button,
+.setting-number::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-.opt__num--wide {
-  width: 3rem;
+.setting-number:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
-.opt__num:focus {
-  outline: none;
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.6);
+.setting-row--disabled {
+  opacity: 0.45;
 }
-
-/* One option per row on a phone: name pinned left, controls pinned right. In a
-   shared wrapping flex row these five toggles broke wherever they happened to
-   fit, which read as a pile of loose numbers rather than a settings list. */
-@media (max-width: 767px) {
-  .opt-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
+.setting-number:disabled {
+  cursor: not-allowed;
+}
+.setting-hint {
+  margin-top: 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 18px;
+}
+.speed-setting > .setting-row {
+  min-height: 20px;
+}
+.speed-setting .settings-title {
+  margin-bottom: 0;
+}
+.speed-description {
+  margin: 12px 0 0;
+  max-width: 28ch;
+}
+.training-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.training-field {
+  display: grid;
+  gap: 6px;
+}
+.training-field > span {
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  line-height: 16px;
+}
+@media (max-width: 1100px) {
+  .advanced-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .opt {
-    justify-content: space-between;
-    width: 100%;
+}
+@media (max-width: 600px) {
+  .advanced-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (pointer: coarse) {
+  .setting-number {
     min-height: 44px;
-    padding: 0.25rem 0;
-    border-bottom: 1px solid hsl(var(--border) / 0.5);
-  }
-  .opt:last-child {
-    border-bottom: 0;
-  }
-  /* Speed has three inputs and cannot share a line with its own name. */
-  .opt--wide {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.4rem;
-    padding: 0.5rem 0;
-  }
-  /* Speed's controls are a sentence, not a pair: they need the full width and
-     permission to wrap, which the shrink-proofing below would otherwise deny. */
-  .opt--wide .opt__ctl {
-    flex-wrap: wrap;
-    flex-shrink: 1;
-    width: 100%;
-  }
-  .opt__num {
-    min-height: 34px;
-  }
-  /* Claw back the last few px so "s" and "min" are not flush with the edge. */
-  .opt {
-    letter-spacing: 0.06em;
-  }
-  .opt__ctl {
-    gap: 0.25rem;
-  }
-  /* The name yields first when a row is tight; the controls must stay whole. */
-  .opt__name {
-    min-width: 0;
-  }
-  .opt__ctl {
-    flex-shrink: 0;
   }
 }
 </style>

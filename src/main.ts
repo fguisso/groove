@@ -25,9 +25,10 @@ import './styles/tailwind.css'
 // - Editor defaults to dark (no `?theme` param needed for the canonical look).
 // - Embed defaults to `auto`: no class is added, and the CSS media query
 //   `@media (prefers-color-scheme: dark)` flips the dark vars when the host's
-//   OS is dark. Hosts that need to force a specific look pass `?theme=light`
+//   declared color scheme is dark (or the browser/OS preference is dark).
+//   Hosts that need to force a specific look pass `?theme=light`
 //   or `?theme=dark`. Doing this in CSS rather than JS means no listener is
-//   needed when the OS theme changes — the iframe just reflows.
+//   needed when the host or OS theme changes; the iframe just reflows.
 function applyInitialClasses() {
   const hash = window.location.hash
   const qIndex = hash.indexOf('?')

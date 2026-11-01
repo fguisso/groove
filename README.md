@@ -12,7 +12,11 @@ It also sparked my curiosity about the stack behind music software on the web: h
 
 ## Features
 
-**Embed via iframe.** This is the feature I care about most. I use it on my personal wiki to document drum lessons and practice goals, and this app exists in large part so that workflow keeps working. Live example: [In the End (lesson notes)](https://wiki.guisso.dev/music/aulas-de-bateria-com-grillo/in-the-end/). The embed view has no editor chrome, can be locked read-only via `?ro=1`, and posts a `groove:resize` message to the parent so the host page can auto-fit the iframe height. The embed follows the host's OS theme automatically — no flicker, no JS listener, no postMessage protocol; it's a CSS `@media (prefers-color-scheme: dark)` rule. To force a specific look, pass `?theme=dark` or `?theme=light` in the URL. A small "Edit" link in the corner of the embed opens the same groove in the full editor in a new tab, so a reader who finds an interesting bar on a lesson page can jump straight into editing it.
+**Compact playback controls.** Play/Stop, tempo, Loop and Metro stay visible. More reveals Follow, Swing, count-in, speed training, pause and timer settings; Less folds them away without resetting values. The disclosure starts collapsed on desktop and smaller screens.
+
+**Score views.** Full score is the default, with the complete wrapped notation and a moving note highlight during playback. The optional Follow switch lives with the other playback options. When enabled, Play centers the playhead and moves a larger horizontal score underneath it, without a scrollbar. Stop always restores the full score and hides the playback marker. The active bar and repeat pass are shown while playing, in both editor and embeds.
+
+**Embed via iframe.** This is the feature I care about most. I use it on my personal wiki to document drum lessons and practice goals, and this app exists in large part so that workflow keeps working. Live example: [In the End (lesson notes)](https://wiki.guisso.dev/music/aulas-de-bateria-com-grillo/in-the-end/). The embed view has no editor chrome, can be locked read-only via `?ro=1`, and posts a `groove:resize` message to the parent so the host page can auto-fit the iframe height. The embed follows the host's declared `color-scheme` through CSS `prefers-color-scheme`, falling back to the browser or OS preference when the host does not declare one. Groove declares the matching `color-scheme` too, so the iframe canvas and native controls agree with its palette. No JS listener or postMessage protocol is needed. To force a specific look, pass `?theme=dark` or `?theme=light` in the URL. A small "Edit" link in the corner of the embed opens the same groove in the full editor in a new tab, so a reader who finds an interesting bar on a lesson page can jump straight into editing it.
 
 > Heads up if you are embedding against a hosted instance on my domain (`guisso.dev` or subdomains): the URL payload format and route shape are not a stable API contract yet. I may change the codec or the routes as the project evolves, which will break embeds pinned to the old format. If you rely on embeds long term, fork this repo and host your own build instead.
 
@@ -42,7 +46,7 @@ A tolerance slider gives a small grace window so a hit slightly off the grid sti
 
 **MIDI and PNG export.** Download the groove as a standard `.mid` file (GM drum mapping) or as a PNG of the rendered score. Both buttons live inside the Settings drawer.
 
-**Light and dark themes.** Tuned to match the aesthetics of modern audio software. The editor defaults to dark; embeds default to following the host's OS theme via CSS, with `?theme=dark` / `?theme=light` as explicit overrides.
+**Light and dark themes.** Tuned to match the aesthetics of modern audio software. The editor defaults to dark; embeds follow the host's declared color scheme via CSS (or the browser/OS preference), with `?theme=dark` / `?theme=light` as explicit overrides.
 
 **Keyboard shortcut.** Press <kbd>Space</kbd> to play/pause. (The grid and inputs swallow the key when focused, so typing in a title field stays normal.)
 

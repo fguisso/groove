@@ -96,7 +96,7 @@ function steps(): DriveStep[] {
       popover: {
         title: 'Read it as a chart',
         description:
-          'Everything you enter renders live as a real percussion staff, beamed per beat, just like a drum chart. While it plays, a marker rides the notes and the chart scrolls to keep the current note centered.',
+          'Everything you enter renders live as a real percussion staff, beamed per beat, just like a drum chart. While it plays, a marker highlights the notes. Enable Follow under More to keep that marker centered while the chart moves.',
         side: 'bottom',
         align: 'center',
       },
@@ -109,7 +109,7 @@ function steps(): DriveStep[] {
       popover: {
         title: 'Hear it and practise it',
         description:
-          'Play the groove through a synthesized kit, no samples to download; the Spacebar toggles it too. Loop the bar, add swing, click in a metronome and a count-in, set a timer that auto-stops the session, or add a silent Pause between loops to review. On a narrow screen these sit behind the Options button.',
+          'Play the groove through a synthesized kit, no samples to download; the Spacebar toggles it too. Loop the bar, add swing, click in a metronome and a count-in, set a timer that auto-stops the session, or add a silent Pause between loops to review. Tempo, Loop and Metro stay visible. More reveals Follow, Swing and the training options; Less folds them away.',
         side: 'top',
         align: 'center',
       },

@@ -4,6 +4,108 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-11-01: Restore transport controls in narrow Wiki embeds
+
+Confirmed GitHub Pages last successfully deployed Groove commit 02ffcb9, before the local theme fixes. Wiki remote main 7199360 also lacks assets/css/custom.css. Theme changes have not been published, so this is not evidence of a new deployed theme regression.
+
+Fixed missing embed Play: Transport hid desktop Play/Stop and BPM below 768 px because the editor supplies a separate mobile bottom bar. Embeds have no bottom bar. Added an explicit embedded prop so embed Play/Stop and numeric BPM remain visible at every width while preserving the editor's mobile controls. Applies globally to EmbedView, including read-only embeds. Added a regression test covering Play/Stop availability and emitted actions. Visually verified the button and BPM inside the roughly 650 px Wiki iframe in the local dark preview without starting audio.
+
+All 68 tests, build including typecheck, lint and formatting passed. Changes remain local and publication is still pending. Existing staged changes were preserved.
+
+---
+
+## 2026-11-01: Give editor visibility its own card
+
+Replaced the full-width Editor lanes strip with a fourth card matching Playback, Loop practice and Speed training. Desktop uses four columns, becoming two below 1100 px and one below 600 px. Existing visibility behavior is unchanged. Validated typecheck and lint; changes remain local.
+
+---
+
+## 2026-11-01: Move editor lane visibility into More/Less
+
+Moved Show cymbals and Show toms out of the Settings drawer into a compact Editor lanes row within the expanded transport. Existing MIDI-store preferences and persistence are preserved; these switches still only hide editor grid lanes, leaving notation and playback intact. Hidden in read-only embeds. Visually checked both switches in Chrome. All 67 tests, build including typecheck, lint and formatting passed. Changes remain local.
+
+---
+
+## 2026-11-01: Type the primary tempo directly
+
+Replaced the desktop transport BPM readout with a numeric input while preserving its visual prominence. Typing commits on Enter or blur; empty or invalid input restores the current tempo. The store clamps values to its existing 30-300 BPM range, now also used by the synchronized slider. Added regression coverage for typed values, clamping, empty input and slider-to-field synchronization. All 67 tests, build including typecheck, lint and formatting passed. Changes remain local.
+
+---
+
+## 2026-11-01: Simplify advanced controls using progressive disclosure
+
+Reviewed NN/g progressive disclosure, Carbon toggle guidelines and Ableton's task-based Control Bar grouping. Applied these principles to three compact groups: Playback, Loop practice and Speed training. Reduced label-to-switch distance, increased label size, replaced uppercase section captions with sentence-case headings, and used subtle group surfaces. Pause duration, timer duration and speed parameters appear when enabled, retaining their values when hidden. Duration units now sit inside fields. A visible hint explains the timer's Loop prerequisite. Desktop uses three columns, with two below 900 px and one below 600 px.
+
+Added a regression test for speed-field disclosure and value retention. All 66 tests, build including typecheck, lint and formatting passed. Visually reviewed the expanded desktop panel in Chrome with playback stopped. Changes remain local.
+
+References: https://www.nngroup.com/articles/progressive-disclosure/, https://www.carbondesignsystem.com/building-blocks/core/components/toggle/guidelines, https://www.ableton.com/en/live-manual/12/live-concepts/.
+
+---
+
+## 2026-11-01: Align the expanded playback panel
+
+Reorganized advanced controls into Playback and Practice groups, with two desktop columns and a single column below 600 px. Switches align to the right; pause and timer use matching numeric fields and unit columns. Speed training now has three equally sized, labeled fields instead of inline numbers. Practice timer controls expose their disabled state when Loop is off. The compact primary row and playback behavior are preserved.
+
+Visually checked the expanded desktop panel in Chrome and left it open for review with playback stopped. All 65 tests, production build including typecheck, lint, and formatting passed. Changes remain local; previously staged work was preserved.
+
+---
+
+## 2026-11-01: Compact playback controls with More/Less
+
+Transport now defaults to a single compact primary row on desktop: Play/Stop, BPM, tempo slider, Loop and Metro. More reveals Follow, Swing, count-in, speed training, pause and timer; Less collapses them again without resetting values. The disclosure applies at every width, replacing the mobile-only Options button. Advanced controls use a grid, and opening no longer scrolls the page automatically. The tempo readout is smaller. Existing phone editor Play/BPM placement and read-only embed restrictions are preserved.
+
+Added three Transport interaction tests for default collapse, primary controls, More/Less state retention and read-only behavior. Browser inspection confirmed the compact desktop row and the expanded advanced panel. All 65 tests, typecheck, lint, formatting and production build passed. Updated the guided tour and README. Playback remained stopped and no audio devices were changed. The last browser cleanup call timed out, so the final disclosure position was not re-verified after the successful compact/expanded captures. Changes remain local and previously staged work was preserved.
+
+---
+
+## 2026-11-01: Playback-only Follow option with a fixed center
+
+Refined the score controls per user feedback. Removed the two score-view buttons and added a single Follow switch alongside the playback options. Full score remains the default and the only stopped layout. Enabling Follow while stopped no longer reflows notation or displays a playhead. During Play, the current note remains centered while a translated native-size score moves behind it. The viewport clips overflow instead of exposing a user-controlled scrollbar, and translation is not clamped at the ends, keeping first and last notes centered. Stop restores Full score and removes the playback marker. The editing measure selection stays separate.
+
+Added session-only `scoreView` state shared by Score and Transport. Added three component regression tests for playback-only activation, the default layout, track movement and restoration on Stop. Updated geometry tests for exact centering at track edges. Browser verification in Chrome confirmed the full stopped layout with Follow enabled, the centered green marker and no score scrollbar during Play, and the wrapped layout again on Stop. Playback was stopped and Follow restored off after testing. The MacBook audio mute was preserved.
+
+Validation: all 62 tests, typecheck, lint, formatting and production build passed. No commit or deployment in this step; previously staged theme work remains intact.
+
+---
+
+## 2026-10-31: Readable full-score and follow playback views
+
+Implemented the two score views requested in the desktop readability issue. Score no longer derives layout from `isPlaying`. Full score is the default and preserves the stopped layout when Play starts. Follow playhead uses a native-size horizontal SVG with a scrolling viewport, rather than squeezing the entire song to fit. Its measure width gives about six visible beats of context. The same controls are present in the editor and embed; active bar and repeat pass are displayed while playing. Musical data, URL payload and repeat expansion are unchanged.
+
+Moved width and scrolling arithmetic into `score-layout.ts` with eight regression tests. Browser checks on the approved 13-stored-bar arrangement confirmed identical editor SVG dimensions before and after Play (1150 by 500), and an unscaled follow SVG 9660 px wide inside a 1166 px viewport. Follow scrolling advanced to later bars, repeated passes were displayed, and the embed also preserved its full-score geometry on Play. Playback was stopped after both checks. The browser viewport override did not change the observed dimensions in the narrow-screen probe, so that probe is not evidence of a mobile browser check; narrow sizing is covered by the geometry tests.
+
+Validation: all 57 tests, typecheck, lint and production build passed. Changes are local; the issue remains open pending review and publication. The theme work already staged in this repository was preserved.
+
+---
+
+## 2026-10-31: Publish theme integration across Wiki pages
+
+The previous canvas fix was still local, so published Groove embeds had not received it. The Wiki also contains older GrooveScribe frames with no native theme support. Added global Wiki CSS: modern Groove frames inherit the host color scheme; GrooveScribe stays on a light source canvas and receives a dark-mode inversion with hue rotation for readable notation. No note data or lesson URLs were changed.
+
+Validated the global frame styles on all 9 Wiki pages containing 36 embeds (14 Groove, 22 GrooveScribe), in both Light and Dark. Light verification reported no failures. Visually checked a legacy score in both themes and modern embeds in the Wiki preview. Groove typecheck, lint, all 49 tests, formatting and production build passed; Hugo build passed. Publishing requires the user's locked 1Password SSH agent to sign the commits; no unsigned workaround was applied.
+
+---
+
+## 2026-10-31: Embed color scheme and Wiki integration
+
+The Wiki already declares its selected `color-scheme`; the embed media query followed it correctly. Groove did not declare its own canvas scheme, so an auto-dark embed rendered light text over a white canvas around its panels. Added matching `color-scheme` values to the light root, explicit dark class and auto-dark embed selector. No Wiki theme code or theme messaging is needed. Updated the theme documentation.
+
+Validation: production build including typecheck, ESLint and formatting passed. In the Wiki preview, switched Light to Dark without reloading the iframe and inspected its computed scheme and foreground tokens; both matched. Explicit light and dark overrides were also verified on fresh page loads. Restored the Wiki's original System preference. No playback or audio-device changes were made. The correction is local and has not been deployed.
+
+The user requested that the playback-readability description and issue link stay out of the Wiki music page. Removed that block there while preserving the separate Groove issue and One Man Band technical knowledge.
+
+---
+
+## 2026-10-31: Local practice preparation
+
+Installed the locked dependencies with `npm ci` and started Vite on `http://127.0.0.1:5173/`. Opened the empty editor in Chrome, dismissed the introductory tour and left playback stopped. The user's Chop Deck tab remains responsible for the electronic drum sounds; no MIDI or audio device settings were changed.
+
+Reviewed the v4 URL codec, voice registry, URL synchronization, brush painting, undo/redo, measure tabs and per-measure repeats. The current editor accepts grid edits and encoded groove URLs; no text notation parser was found. The interface allows eight measures with up to sixteen passes per measure.
+
+Validation: all 49 existing tests passed. No application code or dependency versions changed. Next: enter the user's song structure and rhythm through the existing editor.
+
+---
+
 ## 2026-07-30: Per-measure repeats
 
 **Status:** A measure can now say how many times it sounds. `repeats[m]` is part of the groove,
@@ -1027,3 +1129,7 @@ interactions today) before building anything else, then 2.1 and 2.2 together.
 - **Docs in English**, consistent with existing README and code comments.
 - **No husky / lint-staged** for now. CI is the gatekeeper. Revisit if pre-commit drift becomes a problem.
 - **No custom review agent** for now. Built-in `simplify`, `review`, `security-review` skills are enough until Phase 3.
+
+## 2026-10-31: Desktop playback score readability backlog
+
+Recorded user feedback as [Keep desktop score readable during playback with full-score and follow views](https://github.com/fguisso/groove/issues/1). During playback, long arrangements reportedly collapse into a small single row. Requested desktop modes: retain the wrapped stopped layout with a moving note highlight, or follow a readable larger single row in a scrolling viewport with two or three beats of surrounding context. `Score.vue` currently couples `singleRow` to `isPlaying`; investigate rendering width and existing follow scrolling later. No application changes or playback tests requested or performed for this report.

@@ -147,3 +147,7 @@ Method: 3 to 5 people before and after each phase. No lab needed, record the scr
 
 Still owed from the method section: the numbers above are counted, not observed. The 3-to-5-person
 screen-recorded pass, and the "transcribe a bar dictated in a lesson" task, have not been run.
+
+## 2026-11-01: Compact transport on every screen
+
+More/Less replaces the phone-only Options disclosure and starts collapsed at every width. Primary controls are Play/Stop and BPM (still in the editor bottom bar on phones), tempo, Loop and Metro. Follow, Swing, count-in, speed training, pause and timer live in the advanced panel. Expanding does not scroll the page automatically; collapsing preserves all store values. The expanded panel uses compact Playback, Loop practice and Speed training groups. Editor lanes has its own fourth card. Four desktop columns become two below 1100 px and one below 600 px. Duration and speed fields appear only when their feature is enabled, with existing values preserved. Labels use readable sentence case, units sit inside duration fields, and the timer explains its Loop prerequisite.
