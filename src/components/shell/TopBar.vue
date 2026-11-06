@@ -60,7 +60,7 @@ function onClear() {
       />
     </div>
 
-    <div class="flex items-center gap-1.5">
+    <div class="flex items-center gap-1 sm:gap-1.5">
       <a
         href="https://github.com/fguisso/groove"
         target="_blank"
@@ -104,28 +104,37 @@ function onClear() {
       <Button
         variant="ghost"
         size="sm"
+        aria-label="Clear all notes"
+        class="touch-target px-0 sm:px-2.5"
         title="Clear all notes — asks for confirmation"
         @click="onClear"
       >
-        <Trash2 class="h-3.5 w-3.5" /> Clear
+        <Trash2 class="h-3.5 w-3.5" /> <span class="sr-only sm:not-sr-only">Clear</span>
       </Button>
       <Button
         variant="outline"
         size="sm"
         :title="midiConnected ? 'Settings (MIDI connected)' : 'Settings'"
-        class="relative"
+        class="relative touch-target px-0 sm:px-2.5"
+        aria-label="Settings"
         data-tour="settings"
         @click="midi.togglePanel()"
       >
-        <Settings class="h-3.5 w-3.5" /> Settings
+        <Settings class="h-3.5 w-3.5" /> <span class="sr-only sm:not-sr-only">Settings</span>
         <span
           v-if="midiConnected"
           class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
           aria-hidden="true"
         />
       </Button>
-      <Button size="sm" data-tour="share" @click="$emit('share')">
-        <Share2 class="h-3.5 w-3.5" /> Share
+      <Button
+        size="sm"
+        class="touch-target px-0 sm:px-2.5"
+        aria-label="Share"
+        data-tour="share"
+        @click="$emit('share')"
+      >
+        <Share2 class="h-3.5 w-3.5" /> <span class="sr-only sm:not-sr-only">Share</span>
       </Button>
     </div>
   </header>

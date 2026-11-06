@@ -57,7 +57,7 @@ const scope = computed<Record<BrushState, string>>(() => {
          already on screen and a second Play would be clutter. Lesson mode hides
          that panel entirely, so there this row is the only transport there is. -->
     <div
-      class="flex items-center gap-2 px-2 py-2"
+      class="flex flex-wrap items-center gap-2 px-2 py-2"
       :class="[lessonMode ? '' : 'md:hidden', !props.isPlaying && 'border-b border-border/60']"
     >
       <button

@@ -138,7 +138,7 @@ defineExpose({
     <div
       ref="hostRoot"
       class="score-host w-full overflow-x-auto text-center"
-      :class="{ 'score-host--following': following }"
+      :class="{ 'score-host--following': following, 'score-host--phone-scroll': props.selectable }"
     >
       <div
         class="score-wrap"
@@ -198,6 +198,14 @@ defineExpose({
 
 .score-host--following {
   overflow: clip;
+}
+/* Long arrangements should not push every editor control below the first
+   phone screen. Keep the full score available via native vertical scrolling. */
+@media (max-width: 639px) {
+  .score-host--phone-scroll:not(.score-host--following) {
+    max-height: 40svh;
+    overflow-y: auto;
+  }
 }
 
 .score-host--following .score-marker {

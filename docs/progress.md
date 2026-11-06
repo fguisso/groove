@@ -4,6 +4,14 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-11-06: Contain the phone editor layout
+
+Reproduced the shared six-measure groove at 320/390 px with touch emulation. The toolbar's six actions forced a 320 px viewport to 370 px, shrinking the page; the full score took 774 px of vertical space before the transport and grid. Compact toolbar actions now retain accessible names and 44 px touch targets without labels below `sm`, and the thumb-zone transport wraps instead of overflowing at 320 px. In the editor only, long scores use a 40svh viewport with native vertical scrolling; embed scores remain unrestricted and Follow playback remains unclipped. The last measure remains reachable in the scroll area.
+
+Added two component regression tests. Local browser checks: at 320 px, document width equals visual viewport width (320 px); at 390 px, score viewport is 336 px with 772 px of content and 436 px of vertical scroll. The read-only embed retains its full 772 px score and Play. Typecheck, lint, formatting, 70 tests and production build pass. Real iOS/Safari and physical touch were not tested.
+
+---
+
 ## 2026-11-01: Restore transport controls in narrow Wiki embeds
 
 Confirmed GitHub Pages last successfully deployed Groove commit 02ffcb9, before the local theme fixes. Wiki remote main 7199360 also lacks assets/css/custom.css. Theme changes have not been published, so this is not evidence of a new deployed theme regression.
