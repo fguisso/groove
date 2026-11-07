@@ -3,12 +3,14 @@ import * as Tone from 'tone'
 import type { Groove } from '@/lib/model'
 import { expandTimeline, type PlaySlot } from '@/lib/playback-order'
 import { VOICES, effectiveSynthKey } from '@/lib/voices'
+import { audibleTimeAt } from '@/lib/midi-clock'
+import type { PracticeSlot } from '@/lib/midi-practice'
 
 type SynthKey = 'kk' | 'sn' | 'hh' | 'hho' | 'hhp' | 't1' | 't2' | 't3' | 'ride' | 'crash' | 'click'
 type Trigger = (time: number, velocity?: number) => void
 
 /**
- * Synthesized drum voices. All sounds generated from WebAudio primitives — no sample loading.
+ * Synthesized drum voices. All sounds generated from WebAudio primitives - no sample loading.
  *
  * Design notes:
  *   kick:  MembraneSynth with tight pitch sweep → C2, 3 octaves (~260Hz → 65Hz thud)
@@ -188,7 +190,7 @@ const ALL_SYNTH_KEYS: SynthKey[] = [
 export interface PlayOptions {
   // Silent gap inserted between loop iterations (in seconds). The countdown
   // is exposed via `practiceTimerVal` so the UI can render numbers without
-  // any metronome click — pure visual review time.
+  // any metronome click - pure visual review time.
   practicePauseSec?: number
 }
 
@@ -209,24 +211,29 @@ export function usePlayback() {
   const audioBlocked = ref(false)
   const part = shallowRef<Tone.Part | null>(null)
   const players = shallowRef<Record<SynthKey, Trigger> | null>(null)
-  let onEnded: (() => void) | null = null
+  let onEnded: ((atSec: number) => void) | null = null
 
-  // Geometry of the currently-playing timeline, captured at play() time. Used to
-  // grade an incoming MIDI hit against the step grid using the audio clock (see
-  // nearestStepNow). Null while stopped.
-  interface Timeline {
-    stepSec: number
-    countInLen: number
-    slots: PlaySlot[]
-    loopLen: number
-    loop: boolean
+  let onScheduledStep: ((slot: PracticeSlot) => void) | null = null
+  function setOnScheduledStep(fn: typeof onScheduledStep) {
+    onScheduledStep = fn
   }
-  let timeline: Timeline | null = null
+
+  function audibleTime(eventMs = performance.now()): number {
+    const ctx = rawContext()
+    if (!ctx) return Tone.immediate()
+    return audibleTimeAt(eventMs, {
+      currentTime: ctx.currentTime,
+      performanceMs: performance.now(),
+      baseLatency: ctx.baseLatency,
+      outputLatency: ctx.outputLatency,
+      outputTimestamp: ctx.getOutputTimestamp?.(),
+    })
+  }
 
   // Fires once when a non-looping track reaches its end and tears itself down,
   // so the view can reset the editor (back to the first bar) and drop the wake
-  // lock. Manual stop() does NOT call this — it has its own teardown path.
-  function setOnEnded(fn: (() => void) | null) {
+  // lock. Manual stop() does NOT call this - it has its own teardown path.
+  function setOnEnded(fn: ((atSec: number) => void) | null) {
     onEnded = fn
   }
 
@@ -316,7 +323,6 @@ export function usePlayback() {
     }
     part.value = null
     players.value = null
-    timeline = null
     try {
       const fresh = new Tone.Context({ latencyHint: 'interactive' })
       Tone.setContext(fresh)
@@ -424,7 +430,7 @@ export function usePlayback() {
     const countInLen = g.countIn ? beatsPerMeasure * beatSec : 0
     const trackEnd = countInLen + stepSec * n
 
-    // Practice pause is only meaningful when looping — it's the review window
+    // Practice pause is only meaningful when looping - it's the review window
     // before the next iteration kicks off.
     const pauseSec = g.loop ? Math.max(0, Math.floor(opts.practicePauseSec ?? 0)) : 0
 
@@ -454,6 +460,7 @@ export function usePlayback() {
       events.push([trackEnd + '', { kind: 'end' }])
     }
 
+    let cycle = 0
     const newPart = new Tone.Part((time, ev: Ev) => {
       if (ev.kind === 'count') {
         p.click(time, ev.beat === 1 ? 1 : 0.6)
@@ -479,12 +486,25 @@ export function usePlayback() {
       if (ev.kind === 'end') {
         Tone.getDraw().schedule(() => {
           stop()
-          onEnded?.()
+          onEnded?.(time)
         }, time)
         return
       }
 
       const step = ev.slot.step
+      if (ev.index === 0) cycle++
+      onScheduledStep?.({
+        atSec: time,
+        step,
+        pass: ev.slot.pass,
+        cycle,
+        stepSec: Tone.Time(stepDur).toSeconds(),
+        notes: VOICES.flatMap((v) => {
+          const state = g.voices[v.id]?.[step] ?? 0
+          const midi = v.states[state]?.midi
+          return state && midi != null ? [{ voiceId: v.id, midi }] : []
+        }),
+      })
       for (const voice of VOICES) {
         const arr = g.voices[voice.id]
         if (!arr) continue
@@ -521,7 +541,6 @@ export function usePlayback() {
     newPart.loopEnd = trackEnd + pauseSec + 's'
     newPart.start(0)
     part.value = newPart
-    timeline = { stepSec, countInLen, slots, loopLen: trackEnd + pauseSec, loop: g.loop }
 
     Tone.getTransport().stop()
     Tone.getTransport().position = 0
@@ -540,29 +559,11 @@ export function usePlayback() {
 
   function stop() {
     stopInternal()
-    timeline = null
     isPlaying.value = false
     currentStep.value = -1
     currentPass.value = 0
     countInBeat.value = 0
     practiceTimerVal.value = 0
-  }
-
-  // Project the live transport position onto the step grid so a MIDI hit can be
-  // graded for timing. Reads the audio clock (`transport.seconds`) directly —
-  // it must be called synchronously from the MIDI handler, before Vue's async
-  // flush advances the clock. Returns null during count-in / the loop tail or
-  // when stopped. `deltaSec` is signed: negative = early, positive = late.
-  function nearestStepNow(): { step: number; deltaSec: number } | null {
-    if (!isPlaying.value || !timeline) return null
-    const tl = timeline
-    const ts = Tone.getTransport().seconds
-    const phase = tl.loop ? ((ts % tl.loopLen) + tl.loopLen) % tl.loopLen : ts
-    const rel = phase - tl.countInLen
-    const index = Math.round(rel / tl.stepSec)
-    if (index < 0 || index >= tl.slots.length) return null
-    // Grading is against the grid, so hand back the cell the slot reads from.
-    return { step: tl.slots[index].step, deltaSec: rel - index * tl.stepSec }
   }
 
   function updateRuntime(g: Groove) {
@@ -589,7 +590,8 @@ export function usePlayback() {
     stop,
     updateRuntime,
     setOnEnded,
-    nearestStepNow,
+    setOnScheduledStep,
+    audibleTime,
     resumeAudio,
     audioBlocked,
     audioState,

@@ -8,6 +8,7 @@ import type { VoiceId } from '@/lib/voices'
 import { repeatFor } from '@/lib/playback-order'
 import { followOffset } from '@/lib/score-layout'
 import { useScoreViewStore } from '@/stores/scoreView'
+import { resultLabel } from '@/lib/midi-practice'
 
 const props = withDefaults(
   defineProps<{
@@ -99,17 +100,34 @@ interface MarkerPosition {
   x: number
   y: number
   cls: string
+  title: string
+  symbol: string
 }
 
 const markerPositions = computed<MarkerPosition[]>(() => {
   const out: MarkerPosition[] = []
-  for (const m of markers.value) {
+  const latest = new Map<string, (typeof markers.value)[number]>()
+  for (const m of markers.value) latest.set(`${m.voiceId}:${m.step}`, m)
+  for (const m of latest.values()) {
     const sm = stepMarkers.value[m.step]
     if (!sm) continue
     const y = voiceY.value[m.voiceId]
     if (y == null) continue
     out.push({
       id: m.id,
+      title: resultLabel(m),
+      symbol:
+        m.grade === 'extra'
+          ? '+'
+          : m.grade === 'missed'
+            ? '○'
+            : m.grade === 'early'
+              ? '‹'
+              : m.grade === 'late'
+                ? '›'
+                : m.grade.startsWith('wrong')
+                  ? '◇'
+                  : '',
       x: sm.x + sm.width / 2,
       // voiceY is the row-0 baseline; sm.y shifts it down to the step's row.
       y: y + sm.y,
@@ -179,8 +197,13 @@ defineExpose({
           v-for="m in markerPositions"
           :key="m.id"
           :class="m.cls"
+          :title="m.title"
+          :aria-label="m.title"
+          role="img"
           :style="{ left: m.x + 'px', top: m.y + 'px' }"
-        />
+        >
+          {{ m.symbol }}
+        </div>
       </div>
     </div>
   </div>
@@ -246,7 +269,7 @@ defineExpose({
   cursor: default;
 }
 
-/* Live MIDI marker — sits on top of the actual notehead so the user can read
+/* Live MIDI marker - sits on top of the actual notehead so the user can read
    "I hit this note" at a glance. Semi-transparent on purpose: lets the
    notehead glyph beneath show through, and avoids covering accents/dots. */
 .score-live-marker {
@@ -256,7 +279,13 @@ defineExpose({
   margin-left: -9px;
   margin-top: -9px;
   border-radius: 50%;
-  pointer-events: none;
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  font:
+    bold 18px/1 ui-monospace,
+    monospace;
+  color: hsl(var(--foreground));
   animation: score-marker-appear 220ms ease-out;
   z-index: 2;
 }
@@ -272,13 +301,18 @@ defineExpose({
   background: hsl(28 90% 56% / 0.55);
   box-shadow: 0 0 14px hsl(28 90% 56% / 0.7);
 }
-.score-live-marker--wrong-voice {
-  background: hsl(var(--warn) / 0.55);
-  box-shadow: 0 0 14px hsl(var(--warn) / 0.7);
+.score-live-marker--wrong-voice,
+.score-live-marker--wrong-articulation {
+  background: hsl(285 65% 55% / 0.3);
 }
-.score-live-marker--off-time {
+.score-live-marker--extra {
   background: hsl(var(--destructive) / 0.55);
   box-shadow: 0 0 14px hsl(var(--destructive) / 0.7);
+}
+
+.score-live-marker--missed {
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--card));
 }
 
 @keyframes score-marker-appear {

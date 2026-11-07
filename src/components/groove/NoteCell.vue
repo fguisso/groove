@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 import { VOICE_BY_ID, type VoiceId } from '@/lib/voices'
 import type { LiveMarkerGrade } from '@/stores/midi'
+import { GRADE_LABELS } from '@/lib/midi-practice'
 
 const props = defineProps<{
   value: number
@@ -51,8 +52,12 @@ const liveMarkerClass = computed(() => {
       return 'live-marker live-marker-late'
     case 'wrong-voice':
       return 'live-marker live-marker-wrong-voice'
-    case 'off-time':
-      return 'live-marker live-marker-off-time'
+    case 'wrong-articulation':
+      return 'live-marker live-marker-wrong-voice'
+    case 'missed':
+      return 'live-marker live-marker-missed'
+    case 'extra':
+      return 'live-marker live-marker-extra'
     default:
       return ''
   }
@@ -63,6 +68,7 @@ const liveMarkerClass = computed(() => {
   <button
     type="button"
     :disabled="inertLane"
+    :title="liveMarker ? GRADE_LABELS[liveMarker] : undefined"
     :class="
       cn(
         'led-cell h-9 w-full select-none text-[11px] font-mono font-semibold',

@@ -4,6 +4,14 @@ Running journal. Newest entry on top. Append a dated entry whenever a meaningful
 
 ---
 
+## 2026-11-07: Correct MIDI clock alignment and preserve practice feedback
+
+Confirmed the published scorer reads Tone 15.1.22's 100 ms scheduler lookahead as if it were the audible clock. At 122 BPM this rounds ideal hits into the next, usually empty, sixteenth. The saved 25-measure study reproduces 312 false red markers from 318 ideal notes; the corrected path matches all 318. MIDI receipt timestamps now map through the audio output clock, with residual offset applied before matching. Expected notes come from actual scheduler callback times, preserving repeats, tempo changes and programmed swing.
+
+Added a pure one-to-one grader, synchronous capture of simultaneous hits, distinct timing/omission/extra/wrong-piece/hi-hat-state feedback, and a persistent practice summary. No musical content, hardware settings, Wiki or production deployment changed. Details, primary API sources, validation limits and physical-kit retest procedure: `docs/midi-diagnosis-2026-11-07.md`. Visual preview uses simulated data and is saved alongside the original local evidence. Physical-kit latency remains unmeasured. The user subsequently authorized commit and GitHub Pages publication, accepting physical-kit validation later.
+
+---
+
 ## 2026-11-06: Contain the phone editor layout
 
 Reproduced the shared six-measure groove at 320/390 px with touch emulation. The toolbar's six actions forced a 320 px viewport to 370 px, shrinking the page; the full score took 774 px of vertical space before the transport and grid. Compact toolbar actions now retain accessible names and 44 px touch targets without labels below `sm`, and the thumb-zone transport wraps instead of overflowing at 320 px. In the editor only, long scores use a 40svh viewport with native vertical scrolling; embed scores remain unrestricted and Follow playback remains unclipped. The last measure remains reachable in the scroll area.

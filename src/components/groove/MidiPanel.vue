@@ -18,13 +18,12 @@ const lastHitVoiceLabel = computed(() =>
   lastHit.value ? VOICE_BY_ID[lastHit.value.voiceId].label : null,
 )
 
-// Latency-compensated timing of the most recent hit (negative = early, positive
-// = late). Dial the latency offset until steady hits read near 0 ms.
-const lastTimingMs = computed(() => {
-  const t = lastHit.value?.timing
-  if (!t) return null
-  return Math.round(t.deltaSec * 1000 - latencyMs.value)
-})
+const lastResult = computed(() =>
+  [...midi.markers]
+    .reverse()
+    .find((m) => m.atMs === lastHit.value?.atMs && m.voiceId === lastHit.value?.voiceId),
+)
+const lastTimingMs = computed(() => lastResult.value?.deltaMs ?? null)
 </script>
 
 <template>
@@ -120,8 +119,8 @@ const lastTimingMs = computed(() => {
             Disconnect
           </button>
           <p class="text-[11px] leading-snug text-muted-foreground">
-            Hits during play drop colored markers on the grid and the tablature. Markers stay until
-            the next loop restarts.
+            Hits during play drop colored markers on the grid and the tablature. Results include
+            every repetition and stay until the next Play.
           </p>
         </div>
       </section>
@@ -135,7 +134,7 @@ const lastTimingMs = computed(() => {
           <label class="block space-y-1">
             <div class="flex items-baseline justify-between">
               <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                Latency offset
+                Ajuste residual
               </span>
               <span class="font-mono tabular text-[10px] text-muted-foreground">
                 {{ latencyMs }} ms
@@ -184,7 +183,7 @@ const lastTimingMs = computed(() => {
               :class="
                 lastTimingMs == null
                   ? 'text-muted-foreground'
-                  : Math.abs(lastTimingMs) <= Math.max(8, toleranceMs * 0.4)
+                  : Math.abs(lastTimingMs) <= toleranceMs
                     ? 'text-[hsl(160_70%_45%)]'
                     : lastTimingMs < 0
                       ? 'text-[hsl(200_85%_58%)]'
@@ -192,12 +191,16 @@ const lastTimingMs = computed(() => {
               "
             >
               {{
-                lastTimingMs == null ? '—' : (lastTimingMs > 0 ? '+' : '') + lastTimingMs + ' ms'
+                lastTimingMs == null ? '-' : (lastTimingMs > 0 ? '+' : '') + lastTimingMs + ' ms'
               }}
             </span>
           </div>
           <p class="text-[11px] leading-snug text-muted-foreground">
-            Play the chart and adjust the latency offset until your on-beat hits read near 0 ms.
+            A saída de áudio é compensada automaticamente. Para conferir o ajuste residual, use um
+            compasso simples com metrônomo, toque 16 a 32 pulsos e observe o desvio central e a
+            dispersão no resultado. Se os toques estiverem consistentes, aumente o offset para um
+            desvio positivo e diminua para um negativo. Repita a passagem para conferir. Não calibre
+            durante viradas. O ajuste vale para os próximos toques neste navegador.
             <span class="text-[hsl(200_85%_58%)]">Blue</span> = early,
             <span class="text-[hsl(160_70%_45%)]">green</span> = perfect,
             <span class="text-[hsl(28_90%_56%)]">orange</span> = late.

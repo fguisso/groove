@@ -1,30 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { voiceForMidiNote, type VoiceId } from '@/lib/voices'
-
-export interface HitTiming {
-  step: number
-  deltaSec: number // signed: negative = early, positive = late
-}
+import type { PracticeGrade, PracticeResult } from '@/lib/midi-practice'
 
 export interface MidiHit {
   voiceId: VoiceId
   rawNote: number
   velocity: number
   atMs: number
-  // Step + timing delta captured against the audio clock at hit time. Null when
-  // not playing or during count-in / the loop tail.
-  timing: HitTiming | null
 }
 
-export type LiveMarkerGrade = 'perfect' | 'early' | 'late' | 'wrong-voice' | 'off-time'
-
-export interface LiveMarker {
+export type LiveMarkerGrade = PracticeGrade
+export interface LiveMarker extends PracticeResult {
   id: number
-  voiceId: VoiceId
-  step: number
-  atMs: number
-  grade: LiveMarkerGrade
 }
 
 const LATENCY_KEY = 'groove:midiLatency'
@@ -61,7 +49,7 @@ function writeBool(key: string, v: boolean) {
 }
 
 export const useMidiStore = defineStore('midi', () => {
-  // Wrapped in a ref so `storeToRefs` exposes it — a plain primitive returned
+  // Wrapped in a ref so `storeToRefs` exposes it - a plain primitive returned
   // from a Pinia setup store is dropped by `storeToRefs`, which previously
   // made the panel always render the "not supported" branch.
   const supported = ref('requestMIDIAccess' in navigator)
@@ -71,14 +59,6 @@ export const useMidiStore = defineStore('midi', () => {
   const deviceName = ref<string | null>(null)
   const lastHit = ref<MidiHit | null>(null)
   let cleanups: Array<() => void> = []
-
-  // Supplies the step + timing delta for an incoming hit, read straight off the
-  // audio clock. Registered by the editor (which owns the playback timeline) so
-  // the store stays decoupled from Tone. Called synchronously in onMessage.
-  let hitTimingProvider: (() => HitTiming | null) | null = null
-  function setHitTimingProvider(fn: (() => HitTiming | null) | null) {
-    hitTimingProvider = fn
-  }
 
   const latencyMs = ref(readNumber(LATENCY_KEY, 0))
   const toleranceMs = ref(readNumber(TOLERANCE_KEY, 40))
@@ -120,9 +100,7 @@ export const useMidiStore = defineStore('midi', () => {
     writeBool(LESSON_KEY, v)
   }
 
-  // Live markers — feedback dots dropped onto the grid and tablature for each
-  // MIDI hit during playback. They persist until the loop restarts (cleared
-  // explicitly by the editor on count-in beat 3 or when the track wraps).
+  // Results include every repetition and remain until the next Play.
   const markers = ref<LiveMarker[]>([])
   let nextMarkerId = 1
 
@@ -151,6 +129,7 @@ export const useMidiStore = defineStore('midi', () => {
       return
     }
     try {
+      disconnect()
       const a = await navigator.requestMIDIAccess()
       const inputs = Array.from(a.inputs.values())
       if (inputs.length === 0) {
@@ -190,8 +169,7 @@ export const useMidiStore = defineStore('midi', () => {
       voiceId,
       rawNote: note,
       velocity: velocity / 127,
-      atMs: performance.now(),
-      timing: hitTimingProvider ? hitTimingProvider() : null,
+      atMs: ev.timeStamp,
     }
   }
 
@@ -217,7 +195,6 @@ export const useMidiStore = defineStore('midi', () => {
     setPracticeTimerSec,
     setShowToms,
     setShowCymbals,
-    setHitTimingProvider,
     openPanel,
     closePanel,
     togglePanel,

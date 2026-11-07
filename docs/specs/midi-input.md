@@ -62,3 +62,9 @@ Phases 1 and 2. The named-voice registry owns the GM mapping; the toms and ride 
 ## Before starting
 
 Resolve the open design questions above by appending decisions to this spec. Don't start coding the listener until the grading model and display are settled — they shape the data the listener should expose.
+
+## Decisions verified on 2026-11-07
+
+The live grader now receives the actual scheduled audio time for every expanded playback slot. Input uses the MIDI receipt timestamp mapped to audible output time, then applies the user's residual offset before association. The scheduler's lookahead is never an input clock. Hits are captured synchronously, with one-to-one same-voice preference and explicit omission/extra/wrong-voice/hi-hat-articulation results. Dynamics remain outside grading.
+
+The configured tolerance is the full green window. A separate bounded association window permits blue early and orange late feedback without widening green. A short delivery grace precedes final verdicts. Results accumulate across repetitions and loops, remain after Stop, and reset at the next Play. The latest result per cell is shown on the score and grid; aggregate counts include all passes. Calibration remains a manual residual offset per browser origin. The output path is estimated automatically through Web Audio. See `../midi-diagnosis-2026-11-07.md` for evidence, formulas, limits and physical-kit validation procedure.

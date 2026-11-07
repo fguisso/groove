@@ -151,7 +151,7 @@
     font-feature-settings: 'tnum', 'zero';
   }
 
-  /* score svg — make it inherit colors so dark/light both work */
+  /* score svg - make it inherit colors so dark/light both work */
   .score-host {
     background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
     border: 1px solid hsl(var(--border));
@@ -195,7 +195,7 @@
 
   /* Anything a finger has to hit. Visual size is left to the element; this only
      guarantees the box a thumb can land on. Apple HIG asks 44pt, Material 48dp
-     — 44px plus the surrounding gutter lands the touch pitch at 48. */
+     - 44px plus the surrounding gutter lands the touch pitch at 48. */
   .touch-target {
     touch-action: manipulation;
   }
@@ -290,7 +290,7 @@
   }
   /* Cells own the horizontal axis so a drag across them paints; the browser
      keeps the vertical one so the page still scrolls under a finger. The cost
-     is that the grid no longer flick-scrolls sideways over the cells — use the
+     is that the grid no longer flick-scrolls sideways over the cells - use the
      lane labels or the measure header, which keep `touch-action: auto`. */
   .led-cell {
     touch-action: pan-y;
@@ -310,7 +310,7 @@
     cursor: not-allowed;
   }
   /* Whitespace that marks where each beat (and each bar) starts. It is a left
-     margin, so it eats into the cell's own width — on touch devices it shrinks
+     margin, so it eats into the cell's own width - on touch devices it shrinks
      to a token gap and the column floor grows to compensate. */
   .led-cell.cell-gap {
     margin-left: 1.25rem;
@@ -380,7 +380,7 @@
     }
   }
 
-  /* Live MIDI marker — colored dot dropped on the cell when a hit lands
+  /* Live MIDI marker - colored dot dropped on the cell when a hit lands
      during playback. Pulses in on appearance and stays visible until the
      editor clears it (count-in 3 of next loop). Color encodes verdict. */
   .led-cell.live-marker::after {
@@ -407,12 +407,16 @@
     box-shadow: 0 0 8px hsl(28 90% 56% / 0.85);
   }
   .led-cell.live-marker-wrong-voice::after {
-    background: hsl(var(--warn));
-    box-shadow: 0 0 8px hsl(var(--warn) / 0.85);
+    background: hsl(285 65% 55%);
+    box-shadow: none;
   }
-  .led-cell.live-marker-off-time::after {
+  .led-cell.live-marker-extra::after {
     background: hsl(var(--destructive));
     box-shadow: 0 0 8px hsl(var(--destructive) / 0.85);
+  }
+  .led-cell.live-marker-missed::after {
+    background: transparent;
+    outline: 1px solid hsl(var(--muted-foreground));
   }
   @keyframes live-marker-appear {
     0% {
@@ -551,7 +555,7 @@
   filter: brightness(1.08);
 }
 /* Close (×) button: driver positions it absolutely (top/right). Only retint it
-   — do NOT `all: unset`, which would strip that positioning and misplace it. */
+   - do NOT `all: unset`, which would strip that positioning and misplace it. */
 .driver-popover.groove-tour button.driver-popover-close-btn {
   color: hsl(var(--muted-foreground));
 }
